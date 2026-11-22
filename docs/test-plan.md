@@ -120,6 +120,22 @@ S4b 里两条值得单独说：
 这种带 `/` 的命名，与**已冻结的契约 §3**冲突（§3 里十个动作全是命名空间式）。已改为允许一段或多段
 `/` 分隔的小写标识；唯一性、非空、字典序三条断言一条没动。
 
+**S4c 契约对齐（2026-11-23，提交 `59148c9`）**：把 S4 的实现逐条对回**已冻结的契约**，发现三处不一致，
+全部以契约（§3.5/§3.6/§3.10）为准改实现，而不是改文档：
+
+| 契约 | 之前实现 | 现在 |
+|---|---|---|
+| §3.5 `session/list` 返回 `{id, createdAt, status, mode, turns, overall}` 且 `limit` 限 1–100 | 返回 `answered`/`updatedAt`，无 limit | 按契约字段 + `limit` 越界 `E_BAD_REQUEST` |
+| §3.6 `turn/answer` 返回 `{score, next:{type:'probe'|'question'|'finish'}, sessionStatus}`，同 `questionId` 以最后一次为准 | 返回 `{turn}`，重复提交追加 | 契约形状 + 覆盖写 + `decideProbe` 出 `next` |
+| §3.10 `session/delete` 幂等（再删仍 `deleted:true`） | 第二次 `E_SESSION_NOT_FOUND` | 幂等 |
+
+配套用例 `TC-EDG-031..035`（`tests/integration/session-contract.test.mjs`）：limit 越界四种坏值、浅答只追问一次、
+超长答案在评分前拦下、`overall` 与单卡一致、`inputMode:'voice'` 落盘。
+
+**记录更正（诚实条目）**：S4 收口时我写的 `TC-EDG-024` 断言「删不存在的会话报 `E_SESSION_NOT_FOUND`」，
+`TC-EDG-023` 断言列表项有 `answered` 字段——两条都是**按实现写的期望**，与契约冲突，已按契约改正。
+这是「测试跟着实现漂」的典型，记在此处作为流程证据：契约冻结后，期望值的来源只能是契约。
+
 ### S5 报告与导出（AC-8）
 
 | ID | 层 | AC | 场景 | 状态 |
