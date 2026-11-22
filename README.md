@@ -2,7 +2,7 @@
 
 DeepSeek Harness 插件：**模拟技术面试官**。把简历和目标岗位喂进去，它会按真实面试的节奏连问你——八股、简历项目深挖、手撕代码、行为面——支持文字和语音作答，每题给分并指出「哪句答错、缺什么、怎么补」，最后导出一份可复盘的 Markdown 报告。
 
-> 当前状态：**G4 进行中（切片 S1–S7 已全绿，S6b 真机返修已通过）**。页面已从骨架换成三步向导（录入 → 确认画像 → 逐题作答与报告），待真机点一遍。
+> 当前状态：**G5 交付（v0.1.0）**。G0 章程 → G1 骨架与挂载 → G2 契约 → G3 红基线 → G4 切片 S1–S7 → G5 交付报告，全部收口。交付报告见 [docs/delivery-report.md](docs/delivery-report.md)，人工验收见 [docs/acceptance.md](docs/acceptance.md)。
 > 已实现：`lib/profile.mjs`（简历+JD → 画像）、`lib/session.mjs`（按时长定额、按本人技能/项目定靶、题库补足不重复）、
 > `lib/director.mjs`（按难度定措辞、结论式回答追问一次）、`lib/scorer.mjs`（六维评分 + 越界钳制 + 无证据重试 + 空答 0 分）、
 > `lib/store.mjs`（原子写、2 MB 写前拦截）、`lib/report.mjs`（六维雷达 + Top3 短板 + Markdown 导出），

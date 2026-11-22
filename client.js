@@ -23,6 +23,9 @@ window.__ModuleLoader__.load({
     const NS = 'dsh-mock-interview'
     const PANEL = 'mock-interview'
     const RPC = '/api/dsh-mock-interview/rpc'
+    // Languages the review prompt can speak about; the server stores whatever
+    // string it is given, so this list is a UI convenience, not a contract.
+    const LANGUAGES = ['java', 'python', 'javascript', 'go', 'c++', 'sql']
 
     const DICT = {
       zh: {
@@ -61,8 +64,9 @@ window.__ModuleLoader__.load({
         'run.answer': '你的回答（就当对面坐着真人）',
         'run.submit': '提交回答',
         'run.submitting': '评分中…',
-        'run.code': '代码（不会被执行，只做静态评审）',
         'run.speak': '朗读题目',
+        'run.code': '你的代码（不会真的执行，只做静态评审）',
+        'run.language': '语言',
         'run.voice': '语音作答',
         'run.voice.blocked': '当前没有可用的语音转写（ASR）：请改用文字作答，或在设置里配置自备的 OpenAI 兼容端点。',
         'run.score': '本题评分',
@@ -445,6 +449,7 @@ window.__ModuleLoader__.load({
       const [index, setIndex] = useState(0)
       const [answer, setAnswer] = useState('')
       const [codeText, setCodeText] = useState('')
+      const [language, setLanguage] = useState('java')
       const [card, setCard] = useState(null)
       const [cases, setCases] = useState([])
       const [probe, setProbe] = useState('')
@@ -536,7 +541,7 @@ window.__ModuleLoader__.load({
         setBusy(true)
         setError('')
         const call = isCode
-          ? ['code/review', { sessionId: session.sessionId, questionId: item.id, language: 'java', code: codeText }]
+          ? ['code/review', { sessionId: session.sessionId, questionId: item.id, language, code: codeText }]
           : ['turn/answer', { sessionId: session.sessionId, questionId: item.id, answer, inputMode: 'text' }]
         rpc(call[0], call[1]).then((result) => {
           setBusy(false)
@@ -709,6 +714,15 @@ window.__ModuleLoader__.load({
             h('button', { type: 'button', style: styles.button, onClick: speak }, t('run.speak')),
             h('button', { type: 'button', style: styles.button, onClick: voice }, t('run.voice')),
           ),
+          isCode
+            ? h(Field, { label: t('run.language') },
+                h(Choice, {
+                  label: t('run.language'),
+                  value: language,
+                  options: LANGUAGES.map((value) => ({ value, label: value })),
+                  onChange: (value) => setLanguage(value),
+                }))
+            : null,
           h(Field, { label: isCode ? t('run.code') : t('run.answer') },
             isCode
               ? h('textarea', {
