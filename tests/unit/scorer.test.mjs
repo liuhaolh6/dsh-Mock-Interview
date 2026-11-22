@@ -5,7 +5,7 @@ import { scoreAnswer } from '../../lib/scorer.mjs'
 import { fakeLlm } from '../helpers/fake-llm.mjs'
 import { DIMS, ITEM_SKILL, SCORE_MISSING_DIM, SCORE_NO_EVIDENCE, SCORE_OUT_OF_RANGE, SCORE_VALID } from '../fixtures/score.mjs'
 
-test('TC-SCR-001 a valid reply fills all six dimensions and averages them', async () => {
+test('TC-SCR-001 a valid reply fills all six dimensions and averages the applicable ones', async () => {
   const llm = fakeLlm({ replies: [SCORE_VALID] })
   const { score, warnings } = await scoreAnswer({
     item: ITEM_SKILL,
@@ -14,7 +14,9 @@ test('TC-SCR-001 a valid reply fills all six dimensions and averages them', asyn
     complete: llm.complete,
   })
   assert.deepEqual(Object.keys(score.dims).sort(), [...DIMS].sort())
-  assert.equal(score.overall, 2.5)
+  // kind 'skill' averages correctness/depth/structure/communication only:
+  // (3 + 2 + 3 + 3) / 4 = 2.75 -> 2.8. project/code do not enter the mean.
+  assert.equal(score.overall, 2.8)
   assert.ok(score.evidence.length >= 1)
   assert.equal(score.verdict, 'weak')
   assert.deepEqual(warnings, [])

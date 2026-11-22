@@ -283,6 +283,14 @@ RPC 跑在 Web 服务进程里，**不继承启动它的 shell 的环境变量**
 修法：`apply(ctx)` 里用 `dshHome(scope)` 先取宿主服务 `dshHomePath`（与 `dsh-collections` 一致），
 环境变量只作回退；TC-WIR-006..008 把这个顺序钉死。**结论：每个切片收口都必须包含一次活体 RPC 调用，不能只信单元测试。**
 
+## 评分口径变更（2026-11-23，用户裁决）
+
+活体回归发现「`code:0` 计入六维平均」会让非手撕题的理论上限只有 25/6 ≈ 4.2，且真机上把一次四平八稳的并发回答判成 `overall 2.2 / weak`。用户选择「只按适用维度平均」，据此改契约 §2.4 与 `lib/scorer.mjs`：
+
+- 新增 `APPLICABLE_DIMENSIONS` 与 `applicableDims(kind)`（`lib/contracts.js`）：skill 四维、project 五维、behavior 四维、code 四维。
+- `buildCard` 只对适用维度取平均；不适用维度照常出现在 `dims`，但不进均分、缺失也不产生 warning。
+- `TC-SCR-001` 期望从 2.5 改为 **2.8**（(3+2+3+3)/4 = 2.75），改的是期望值且手算复核过；其余用例（`TC-EDG-008` 的 5.0/3.8、`TC-SCR-002`、`TC-SCR-005`）断言不变即通过。
+
 ## S6b 真机返修（2026-11-23）
 
 活体回归发现三处只有真环境才暴露的缺陷，全部先补红用例再修：

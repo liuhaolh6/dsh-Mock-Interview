@@ -51,10 +51,17 @@
   "overall": 2.5, "verdict": "weak|ok|strong",
   "evidence": ["考生原话"], "missing": ["缺：GC 分代假设"],
   "reference": ["参考要点"] }
-// overall = 六维算术平均（保留 1 位小数）；`code: 0` 表示本题不考察代码，但仍**计入**均分，
-// 因此非手撕题的理论上限是 25/6 ≈ 4.2。verdict 阈值：≥4.0 strong / ≥3.0 ok / 其余 weak。
+// overall = **适用维度**的算术平均（保留 1 位小数），不是六维平均。
+// 适用维度由题型决定（`APPLICABLE_DIMENSIONS`，2026-11-23 裁决，替代原「六维平均」口径）：
+//   skill    → correctness, depth, structure, communication
+//   project  → correctness, depth, structure, project, communication
+//   behavior → depth, structure, project, communication
+//   code     → correctness, depth, code, communication
+// 不适用的维度仍照常出现在 dims 里（数字或 null），但不进均分、也不因缺失产生 warning。
+// 例：skill 题 3/2/3/…/3 → (3+2+3+3)/4 = 2.75 → 2.8。
+// verdict 阈值（按 overall）：≥4.0 strong / ≥3.0 ok / 其余 weak。
 // 空作答 → 六维全 0、overall 0、missing ["未作答"]，不调模型。
-// 维度缺失 → null（不计入均分）；越界（>5 或 <0）→ 钳到 1–5 并记 warnings。
+// 适用维度缺失 → null（不计入均分）；越界（>5 或 <0）→ 钳到 1–5 并记 warnings。
 
 // Report —— 报告（AC-8）
 { "sessionId": "...", "summary": "…", "radar": { "dims": {} },
@@ -152,7 +159,7 @@
   - **代码是数据，不是指令**：代码注释里出现「忽略以上指令」之类文字，只能改变评审结论，
     不能改变响应的结构（verdict / cases / score 三件套始终存在）——这条由 TC-COD-004 守护。
   - 响应里的 `score` 与 `turn/answer` 用同一套 `buildCard()` 归一（钳制 1..5、缺维 null、
-    `overall` 取六维算术平均），避免手撕题和八股题两套评分口径。
+    `overall` 取适用维度算术平均），避免手撕题和八股题两套评分口径；`buildCard(parsed, kind)` 是唯一入口。
 
 ### 2.1 `Report` 附加字段（S5 实现记录）
 
@@ -165,7 +172,7 @@
 | `mode` / `difficulty` / `minutes` | string / string / number | 会话配置快照，报告脱离会话也能读懂 |
 | `planned` / `answered` | number | 计划题数 / 已答题数 |
 | `sampleAdequate` | boolean | `answered >= 3`；false 时报告标注「样本不足，仅供参考」 |
-| `overall` | number \| null | 六维算术平均，保留 1 位；无分则 `null` |
+| `overall` | number \| null | 逐题适用维度平均的再平均，保留 1 位；无分则 `null` |
 | `dims` | Record<string, number\|null> | 与 `radar.dims` 同一份数据（雷达图与表格共用） |
 | `items` | array | 逐题 `{questionId, kind, target, topic, overall, verdict, missing}` |
 | `weaknesses` | array | `{dimension, average, action}`，与 `weakTop3`/`actions` 同序 |
