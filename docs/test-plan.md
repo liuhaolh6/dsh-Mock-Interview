@@ -35,7 +35,7 @@
 |---|---|---|---|---|---|---|
 | TC-PRO-001 | U | AC-1 | 简历含「Java / Spring Boot / 3 年」与 1 个项目，JD 为「Java 后端 / 中级」 | `extractProfile` | 返回 `profile.skills` 含 Spring Boot、`years===3`、`projects.length≥1`、`jd.level==='mid'` | 🟢 |
 | TC-PRO-002 | U | AC-1 | 简历与 JD 都是空白字符串 | `extractProfile` | 抛 `E_BAD_REQUEST`，且**未**调用 LLM | 🟢 |
-| TC-PRO-003 | U | AC-1 | fakeLlm 两次都返回非 JSON 文本 | `extractProfile` | 抛 `E_PROFILE_INVALID`，调用次数恰好 2 | 🔴 |
+| TC-PRO-003 | U | AC-1 | fakeLlm 两次都返回非 JSON 文本 | `extractProfile` | 抛 `E_PROFILE_INVALID`，调用次数恰好 2 | 🟢 |
 | TC-PRO-004 | U | AC-1 | fakeLlm 抛 `Error('timeout')` | `extractProfile` | 抛 `E_LLM_TIMEOUT` | 🔴 |
 | TC-PRO-005 | U | AC-1 | 简历 20 001 字符 | `extractProfile` | 抛 `E_BAD_REQUEST`，未调用 LLM | 🔴 |
 | TC-PRO-006 | U | AC-1 | JD 只有 `{title:'Java 后端'}`，无 company/level | `extractProfile` | 返回画像且 `warnings` 含「缺少公司/级别」；`jd.title` 保留 | 🔴 |

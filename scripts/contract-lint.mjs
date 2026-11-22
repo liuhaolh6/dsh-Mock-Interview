@@ -83,7 +83,11 @@ const libSources = walk(join(ROOT, 'lib'))
 const codeUseSource = `${indexSource}\n${libSources}`
 const usedCodes = new Set([...codeUseSource.matchAll(/(?:\bfail\(\s*'|\bcode:\s*'|\bContractError\(\s*')([A-Z_]+)'/g)].map((match) => match[1]))
 for (const code of usedCodes) {
-  if (!Object.hasOwn(ERROR_CODES, code)) note(errors, `error code: "${code}" used in index.js/lib but missing from ERROR_CODES`)
+  const declaredNow = Object.hasOwn(ERROR_CODES, code)
+  const declaredPlanned = PLANNED_ERROR_CODES.includes(code)
+  if (!declaredNow && !declaredPlanned) {
+    note(errors, `error code: "${code}" used in index.js/lib but missing from ERROR_CODES and PLANNED_ERROR_CODES`)
+  }
 }
 for (const code of Object.keys(ERROR_CODES)) {
   if (!usedCodes.has(code)) note(warnings, `error code: "${code}" declared but never returned yet`)
