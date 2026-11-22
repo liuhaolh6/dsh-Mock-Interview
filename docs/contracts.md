@@ -34,7 +34,10 @@
 // Plan —— 出题计划（AC-2）
 { "mode": "tech-1", "difficulty": "mid", "minutes": 30, "budget": 9,
   "items": [{ "id": "q1", "kind": "skill|project|code|behavior", "topic": "JVM GC",
-              "target": "skill:jvm-gc", "weight": 1 }] }
+              "target": "skill:Java", "weight": 1 }] }
+// target 三种前缀：`skill:<画像技能名>` / `project:<画像项目名>` / `bank:<题库主题>`。
+// 同一会话内 target 不复重（先吃自己简历里的点，再用题库补足）；
+// `topic` 是给考生看的主题名，`kind` 决定手撕/项目/行为题的措辞。
 
 // Turn —— 一问一答（AC-3/4/6）
 { "questionId": "q1", "kind": "skill", "prompt": "…", "answer": "…",
@@ -44,9 +47,13 @@
 // ScoreCard —— 六维（AC-4）
 { "dims": { "correctness": 3, "depth": 2, "structure": 3,
             "project": 4, "code": 0, "communication": 3 },   // 1–5 整数
-  "overall": 3.0, "verdict": "weak|ok|strong",
+  "overall": 2.5, "verdict": "weak|ok|strong",
   "evidence": ["考生原话"], "missing": ["缺：GC 分代假设"],
   "reference": ["参考要点"] }
+// overall = 六维算术平均（保留 1 位小数）；`code: 0` 表示本题不考察代码，但仍**计入**均分，
+// 因此非手撕题的理论上限是 25/6 ≈ 4.2。verdict 阈值：≥4.0 strong / ≥3.0 ok / 其余 weak。
+// 空作答 → 六维全 0、overall 0、missing ["未作答"]，不调模型。
+// 维度缺失 → null（不计入均分）；越界（>5 或 <0）→ 钳到 1–5 并记 warnings。
 
 // Report —— 报告（AC-8）
 { "sessionId": "...", "summary": "…", "radar": { "dims": {} },
