@@ -40,7 +40,7 @@
 | TC-PRO-005 | U | AC-1 | 简历 20 001 字符 | `extractProfile` | 抛 `E_BAD_REQUEST`，未调用 LLM | 🟢 |
 | TC-PRO-006 | U | AC-1 | JD 只有 `{title:'Java 后端'}`，无 company/level | `extractProfile` | 返回画像且 `warnings` 含「缺少公司/级别」；`jd.title` 保留 | 🟢 |
 | TC-SES-001 | U | AC-2 | 画像已确认，`tech-1`/`mid`/30 分钟 | `buildPlan` | `plan.budget===9`，`plan.items.length` 落在 7–11（`budgetTolerance=2`） | 🟢 |
-| TC-SES-002 | U | AC-2 | `minutes: 20` | `buildPlan` | 抛 `E_BAD_REQUEST` | 🔴 |
+| TC-SES-002 | U | AC-2 | `minutes: 20` | `buildPlan` | 抛 `E_BAD_REQUEST` | 🟢 |
 | TC-SES-003 | U | AC-2 | 画像无技能、无项目 | `buildPlan` | 抛 `E_PROFILE_INCOMPLETE` | 🔴 |
 | TC-SES-004 | U | AC-2 | 同上正例 | `buildPlan` | `items` 中至少 1 条 `kind==='code'` | 🔴 |
 | TC-SES-005 | U | AC-2 | 画像含 6 项技能、2 个项目 | `buildPlan` | 至少 3 条 item 的 `target` 指向画像里的技能或项目 | 🔴 |
