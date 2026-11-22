@@ -13,6 +13,9 @@
  * @module index.js
  */
 
+import { basename, dirname, join } from 'node:path'
+import { homedir } from 'node:os'
+
 import { ACTIONS, ERROR_CODES, LIMITS, RPC_PATH, SCHEMA_VERSION } from './lib/contracts.js'
 import { decideProbe } from './lib/director.mjs'
 import { isContractError } from './lib/errors.mjs'
@@ -272,21 +275,36 @@ function llmBridge(scope) {
 }
 
 /**
- * Where sessions live. The host exposes it as `dshHomePath`; a bare process
- * env is only a fallback, because the web server does not inherit it.
+ * Where sessions live. The host exposes it as the `dshHomePath` *service
+ * function* (not a string), so it has to be called; the environment and the
+ * profile directory are only fallbacks, because the web server does not
+ * inherit the shell environment.
  *
  * @param {object} scope Cordis scope with services
- * @returns {string|undefined}
+ * @returns {string}
  */
 export function dshHome(scope) {
   try {
-    const value = scope?.get?.('dshHomePath')
-    if (typeof value === 'string' && value !== '') return value
+    const service = scope?.get?.('dshHomePath')
+    if (typeof service === 'function') {
+      const resolved = service()
+      if (typeof resolved === 'string' && resolved.trim() !== '') return resolved.trim()
+    } else if (typeof service === 'string' && service.trim() !== '') {
+      return service.trim()
+    }
   } catch {
-    // Service not present: fall through to the environment.
+    // Service missing or throwing: fall through to the environment.
   }
-  const env = process.env.DSH_HOME
-  return typeof env === 'string' && env !== '' ? env : undefined
+  const fromEnv = process.env.DSH_HOME
+  if (typeof fromEnv === 'string' && fromEnv.trim() !== '') return fromEnv.trim()
+  const profileDir = process.env.DSH_PROFILE_DIR
+  if (typeof profileDir === 'string' && profileDir.trim() !== '') {
+    const trimmed = profileDir.trim()
+    const parent = dirname(dirname(trimmed))
+    if (parent !== '' && basename(dirname(trimmed)) === 'profiles') return parent
+    return trimmed
+  }
+  return join(homedir(), '.dsh')
 }
 
 /**

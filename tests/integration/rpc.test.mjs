@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { apply, dispatch, dshHome, RPC_PATH, VERSION } from '../../index.js'
@@ -163,7 +163,8 @@ test('TC-WIR-005 a broken request stream answers 500 with E_INTERNAL', async () 
 })
 test('TC-WIR-006 the host service supplies DSH_HOME when the env does not', async () => {
   const home = join(tmpdir(), 'dsh-mock-interview-wir-home')
-  const { ctx, routes } = fakeContext(undefined, { dshHomePath: home })
+  // The host registers dshHomePath as a function, not a string.
+  const { ctx, routes } = fakeContext(undefined, { dshHomePath: () => home })
   apply(ctx)
   const { res, captured } = fakeResponse()
   await routes[0].handler(fakeRequest([JSON.stringify({ op: 'session/list' })]), res)
@@ -172,37 +173,55 @@ test('TC-WIR-006 the host service supplies DSH_HOME when the env does not', asyn
   assert.deepEqual(payload.value.sessions, [])
 })
 
-test('TC-WIR-007 without a host service or env there is no home, and the request says so', async () => {
-  const saved = process.env.DSH_HOME
+test('TC-WIR-007 with no service and no env the home degrades to ~/.dsh', async () => {
+  const saved = { home: process.env.DSH_HOME, profile: process.env.DSH_PROFILE_DIR }
   delete process.env.DSH_HOME
+  delete process.env.DSH_PROFILE_DIR
   try {
+    assert.equal(dshHome({ get: () => undefined }), join(homedir(), '.dsh'))
+
     const { ctx, routes } = fakeContext()
     apply(ctx)
     const { res, captured } = fakeResponse()
     await routes[0].handler(fakeRequest([JSON.stringify({ op: 'session/list' })]), res)
-    assert.equal(JSON.parse(captured.body).error.code, 'E_BAD_REQUEST')
+    const payload = JSON.parse(captured.body)
+    assert.equal(payload.ok, true, captured.body)
+    assert.ok(Array.isArray(payload.value.sessions))
   } finally {
-    if (saved !== undefined) process.env.DSH_HOME = saved
+    for (const [key, value] of Object.entries({ DSH_HOME: saved.home, DSH_PROFILE_DIR: saved.profile })) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
   }
 })
 
-test('TC-WIR-008 dshHome falls back to the environment and survives a throwing service', () => {
-  const saved = process.env.DSH_HOME
-  process.env.DSH_HOME = 'D:/fallback-home'
+test('TC-WIR-008 dshHome prefers the service function, then env, then profile dir', () => {
+  const saved = { home: process.env.DSH_HOME, profile: process.env.DSH_PROFILE_DIR }
+  delete process.env.DSH_HOME
+  delete process.env.DSH_PROFILE_DIR
   try {
-    assert.equal(dshHome({ get: () => undefined }), 'D:/fallback-home')
-    assert.equal(dshHome({ get: () => '' }), 'D:/fallback-home')
+    assert.equal(dshHome({ get: () => () => 'D:/from-service' }), 'D:/from-service')
+    assert.equal(dshHome({ get: () => () => '' }), join(homedir(), '.dsh'))
+    assert.equal(dshHome({ get: () => 'D:/string-service' }), 'D:/string-service')
     assert.equal(
       dshHome({
         get: () => {
           throw new Error('service exploded')
         },
       }),
-      'D:/fallback-home',
+      join(homedir(), '.dsh'),
     )
-    assert.equal(dshHome(undefined), 'D:/fallback-home')
+    process.env.DSH_HOME = 'D:/from-env'
+    assert.equal(dshHome(undefined), 'D:/from-env')
+    process.env.DSH_PROFILE_DIR = 'D:/home/profiles/desktop'
+    delete process.env.DSH_HOME
+    assert.equal(dshHome({ get: () => () => '' }).replaceAll('\\', '/'), 'D:/home')
+    process.env.DSH_PROFILE_DIR = 'D:/not-a-profile'
+    assert.equal(dshHome({ get: () => () => '' }), 'D:/not-a-profile')
   } finally {
-    if (saved === undefined) delete process.env.DSH_HOME
-    else process.env.DSH_HOME = saved
+    for (const [key, value] of Object.entries({ DSH_HOME: saved.home, DSH_PROFILE_DIR: saved.profile })) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
   }
 })
