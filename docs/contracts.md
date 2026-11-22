@@ -107,6 +107,18 @@
 - 边界：空答案视为「不会」→ 记 0 分并追问一次，不报错；同一 `questionId` 重复提交以最后一次为准（覆盖）。
 - 幂等：否（每次提交推进一题）。
 
+### 3.6.1 语音作答的降级语义（S6 实现记录）
+
+宿主**从不接收、也不保存音频**：`turn/answer` 只接受浏览器用自备 ASR 端点转好的文本。
+因此「语音」在本插件里等价于「带 `inputMode` 标记的文字」，失败模式只有三种：
+
+| 请求 | 结果 | 错误码 | 可重试 |
+| --- | --- | --- | --- |
+| `inputMode:"voice"` 且**没有** `answer` 字段 | 明示未配置 ASR，提示改用文字或去设置里填端点 | `E_ASR_NOT_CONFIGURED` | 是（配置后重录） |
+| `inputMode:"voice"` 且 `answer` 为空白 | 转写为空，提示重录 | `E_BAD_REQUEST` | 是 |
+| `inputMode:"voice"` 且 `answer` 有内容 | 与文字作答完全同一条评分路径，turn 上记 `inputMode:"voice"` | — | — |
+
+三种失败**都不落盘**：不会产生半条 turn，也不会把音频写进会话文件（`tests/integration/voice.test.mjs` 用正则断言会话 JSON 里没有 `audio|base64|blob`）。
 ### 3.7 `code/review`
 - 请求：`{ "op": "code/review", "sessionId": "...", "questionId": "q3", "language": "java", "code": "…" }`
 - 响应：`{ "score": ScoreCard, "verdict": "presumed-correct|presumed-wrong|unverifiable", "cases": [{ input, expected, actual, ok }], "executed": false }`
