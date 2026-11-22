@@ -193,6 +193,9 @@ S4b 里两条值得单独说：
 | TC-WIR-010 | I | AC-3 | adapter 以 `finish.reason.kind='aborted'` 结束 → `E_LLM_TIMEOUT` | ✅ |
 | TC-WIR-011 | I | AC-4 | 默认选择被用作路由：`stream` 收到的 `provider`/`model` 等于 `agentDefaultModel.currentSelection()`，`text-delta` 正确拼接并出分 | ✅ |
 | TC-WIR-012 | I | AC-4 | 既无默认选择也无 provider 列表 → `E_LLM_UNAVAILABLE`（文案含「默认模型」），不发请求 | ✅ |
+| TC-WIR-014 | I | AC-4 | `reasoning-delta` 不进答案，只拼 `text-delta`；请求带 `maxTokens >= 2048` | ✅ |
+| TC-WIR-015 | I | AC-4 | `finish.reason.kind='max-tokens'`（推理吃满预算）→ `E_LLM_UNAVAILABLE`（截断），不误报 `E_SCORE_INVALID` | ✅ |
+| TC-WIR-016 | I | AC-4 | 系统指令同时作为首条 user 消息下发，路由忽略 `system` 时评分规则仍在 | ✅ |
 | TC-WIR-013 | I | AC-4 | 消息被规整为文本块数组；assistant 历史转成 user 上下文重放，adapter 不再报 `content.some is not a function` | ✅ |
 
 **S6b 转绿记录（2026-11-23）**：4 条一起转绿（`tests/integration/llm-bridge.test.mjs`）。
@@ -279,3 +282,14 @@ RPC 跑在 Web 服务进程里，**不继承启动它的 shell 的环境变量**
 
 修法：`apply(ctx)` 里用 `dshHome(scope)` 先取宿主服务 `dshHomePath`（与 `dsh-collections` 一致），
 环境变量只作回退；TC-WIR-006..008 把这个顺序钉死。**结论：每个切片收口都必须包含一次活体 RPC 调用，不能只信单元测试。**
+
+## S6b 真机返修（2026-11-23）
+
+活体回归发现三处只有真环境才暴露的缺陷，全部先补红用例再修：
+
+1. `session/list` → `E_BAD_REQUEST 缺少 DSH_HOME`：RPC 在 Web 服务进程里，不继承 shell 环境；`scope.get('dshHomePath')` 是**服务函数**必须调用（对照 `dsh-collections/index.js:65`）。
+2. `turn/answer` → `E_SCORE_INVALID`（6 ms）：`GenerateOptions` 必须带 `provider`/`model`，否则宿主流根本不发请求；adapter 的失败是终止 `finish` chunk，不是异常。
+3. `content.some is not a function`：`RequestMessage.content` 必须是文本块数组。
+4. `E_SCORE_INVALID`（11 s，真调了模型）：推理模型的 `reasoning-delta` 被当答案拼进来、且没给 `maxTokens`，预算被思考吃满 → 空文本。现只拼 `text-delta`、显式 `maxTokens: 4096`、`max-tokens` 映射为截断错误，系统指令额外以首条 user 消息下发。
+
+教训：错误耗时是判据——<20 ms 说明没走新代码或本地短路，>1 s 才是真的调模型；每次 host 改动都必须重启 Web 端。

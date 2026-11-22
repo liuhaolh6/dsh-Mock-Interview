@@ -293,8 +293,13 @@ function textBlocks(content) {
  * @param {unknown} messages engine-supplied messages
  * @returns {Array<{ role: 'user', content: Array<{ type: 'text', text: string }> }>}
  */
-function toRequestMessages(messages) {
+function toRequestMessages(messages, system) {
   const out = []
+  if (typeof system === 'string' && system.trim() !== '') {
+    // The `system` option is honoured by the adapter, but repeating the rules as
+    // the first user turn keeps scoring correct on a route that ignores it.
+    out.push({ role: 'user', content: [{ type: 'text', text: '【系统指令】\n' + system.trim() }] })
+  }
   for (const message of Array.isArray(messages) ? messages : []) {
     if (message === null || typeof message !== 'object') continue
     const blocks = textBlocks(message.content)
@@ -364,7 +369,14 @@ function llmBridge(scope) {
     }
     const parts = []
     let failure
-    const stream = llm.stream({ ...route, system, messages: toRequestMessages(messages), signal, purpose: 'dsh-mock-interview' })
+    const stream = llm.stream({
+      ...route,
+      maxTokens: LIMITS.llmMaxTokens,
+      system,
+      messages: toRequestMessages(messages, system),
+      signal,
+      purpose: 'dsh-mock-interview',
+    })
     for await (const chunk of stream) {
       if (chunk?.type === 'finish') {
         const kind = chunk.reason?.kind
@@ -372,9 +384,15 @@ function llmBridge(scope) {
           failure = new ContractError('E_LLM_TIMEOUT', '模型调用超时或被取消')
         } else if (kind === 'error') {
           failure = new ContractError('E_LLM_UNAVAILABLE', chunk.reason?.failure?.message || '模型调用失败')
+        } else if (kind === 'max-tokens') {
+          // A reasoning model can spend the whole budget thinking; the answer is
+          // then truncated, which is not the same thing as bad JSON.
+          failure = new ContractError('E_LLM_UNAVAILABLE', '模型输出被截断（max-tokens），请重试或换更小的题')
         }
         continue
       }
+      // Reasoning deltas are the model's thinking, never the answer.
+      if (chunk?.type !== undefined && chunk.type !== 'text-delta') continue
       const text = chunk?.text ?? chunk?.delta ?? chunk?.content
       if (typeof text === 'string') parts.push(text)
     }

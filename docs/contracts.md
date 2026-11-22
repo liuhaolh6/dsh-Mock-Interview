@@ -18,6 +18,7 @@
 | 答案上限 | 单次作答 4 000 字符（`LIMITS.maxAnswerChars`）；简历文本 20 000 字符（`LIMITS.maxResumeChars`） |
 | 会话文件上限 | 2 MB（`LIMITS.maxSessionBytes`）；超限 → `E_SESSION_TOO_LARGE` |
 | LLM 超时 | 45 s（`LIMITS.llmTimeoutMs`）；重试一次后仍失败 → `E_LLM_TIMEOUT` |
+| LLM 输出预算 | `LIMITS.llmMaxTokens = 4096`；推理模型会把预算先花在思考上，预算用尽即 `E_LLM_UNAVAILABLE`（截断），不当作评分 JSON 错误 |
 | 幂等 | 只有 `ping`、`session/get`、`session/list`、`report/export`（相同路径重复导出覆盖同名文件）可重复调用；其余动作每调用一次都产生新状态 |
 
 **2 MB 会话上限的依据**（2026-11-23 估算，非拍脑袋）：45 分钟档最多 13 题，最坏情况 = 3 道手撕各 20 000 字 + 10 道口头作答各 4 000 字（52 000）+ 13 份评分卡各 1 600 字（20 800）+ 15 条边界用例推演（3 900）+ 画像/计划/报告等元数据（12 000）≈ **136 700 字符**；中文按 UTF-8 三字节计 ≈ 0.39 MB，叠加 JSON 结构与转义 35% ≈ **0.53 MB**，即 2 MB 仍有 **≈3.8 倍**余量。全会话上限只用于拦「异常膨胀」（例如模型把整段上下文回吐进答案），正常使用不会触发。

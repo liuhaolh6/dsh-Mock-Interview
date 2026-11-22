@@ -234,3 +234,103 @@ test('TC-WIR-013 string contents become text blocks and assistant turns become u
     await rm(home, { recursive: true, force: true })
   }
 })
+
+test('TC-WIR-014 reasoning deltas never enter the answer and a token budget is requested', async () => {
+  const home = await tempHome()
+  const saved = process.env.DSH_HOME
+  process.env.DSH_HOME = home
+  try {
+    const seen = []
+    const ask = harness({
+      selection: { provider: 'deepseek', model: 'deepseek-chat' },
+      llm: {
+        stream: async function* (options) {
+          seen.push(options)
+          yield { type: 'reasoning-delta', index: 0, text: '{"dims":{"correctness":5}} 这段思考不该被当成答案。' }
+          yield { type: 'text-delta', index: 1, text: CODE_REVIEW_OK.slice(0, 20) }
+          yield { type: 'text-delta', index: 1, text: CODE_REVIEW_OK.slice(20) }
+          yield { type: 'finish', reason: { kind: 'stop' } }
+        },
+      },
+    })
+    const created = await ask(START)
+    const answered = await ask({
+      op: 'turn/answer',
+      sessionId: created.value.sessionId,
+      questionId: created.value.plan.items[0].id,
+      answer: '索引用的是 B+ 树。',
+    })
+    assert.equal(answered.ok, true, JSON.stringify(answered))
+    assert.equal(typeof seen[0].maxTokens, 'number')
+    assert.equal(seen[0].maxTokens >= 2048, true)
+  } finally {
+    if (saved === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = saved
+    await rm(home, { recursive: true, force: true })
+  }
+})
+
+test('TC-WIR-015 a max-tokens finish is reported as truncation, not as bad JSON', async () => {
+  const home = await tempHome()
+  const saved = process.env.DSH_HOME
+  process.env.DSH_HOME = home
+  try {
+    const ask = harness({
+      selection: { provider: 'deepseek', model: 'deepseek-chat' },
+      llm: {
+        stream: async function* () {
+          yield { type: 'reasoning-delta', index: 0, text: '思考很久' }
+          yield { type: 'finish', reason: { kind: 'max-tokens' } }
+        },
+      },
+    })
+    const created = await ask(START)
+    const answered = await ask({
+      op: 'turn/answer',
+      sessionId: created.value.sessionId,
+      questionId: created.value.plan.items[0].id,
+      answer: '索引用的是 B+ 树。',
+    })
+    assert.equal(answered.ok, false)
+    assert.equal(answered.error.code, 'E_LLM_UNAVAILABLE')
+    assert.match(answered.error.message, /截断|max-tokens/)
+  } finally {
+    if (saved === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = saved
+    await rm(home, { recursive: true, force: true })
+  }
+})
+
+test('TC-WIR-016 the system instruction also travels inside the messages', async () => {
+  const home = await tempHome()
+  const saved = process.env.DSH_HOME
+  process.env.DSH_HOME = home
+  try {
+    const seen = []
+    const ask = harness({
+      selection: { provider: 'deepseek', model: 'deepseek-chat' },
+      llm: {
+        stream: async function* (options) {
+          seen.push(structuredClone(options))
+          yield { type: 'text-delta', index: 0, text: CODE_REVIEW_OK }
+          yield { type: 'finish', reason: { kind: 'stop' } }
+        },
+      },
+    })
+    const created = await ask(START)
+    const answered = await ask({
+      op: 'turn/answer',
+      sessionId: created.value.sessionId,
+      questionId: created.value.plan.items[0].id,
+      answer: '索引用的是 B+ 树。',
+    })
+    assert.equal(answered.ok, true, JSON.stringify(answered))
+    const first = seen[0].messages[0]
+    const text = first.content.map((block) => block.text).join('\n')
+    assert.match(text, /只输出 JSON|评分官/)
+  } finally {
+    if (saved === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = saved
+    await rm(home, { recursive: true, force: true })
+  }
+})
