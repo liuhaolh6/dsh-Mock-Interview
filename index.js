@@ -167,6 +167,22 @@ export async function dispatch(request, deps = {}) {
         if (item === undefined) {
           return fail('E_BAD_REQUEST', `plan 里没有题目 ${String(body.questionId)}`)
         }
+        // S6 / AC-5: the host never records or uploads audio. A voice turn is
+        // only a transcript the browser already produced, so the missing piece
+        // is always the user-provided ASR endpoint — say so instead of guessing.
+        const inputMode = body.inputMode === 'voice' ? 'voice' : 'text'
+        if (inputMode === 'voice') {
+          if (typeof body.answer !== 'string') {
+            return fail(
+              'E_ASR_NOT_CONFIGURED',
+              '当前没有可用的语音转写（ASR）：请改用文字作答，或在设置里配置自备的 OpenAI 兼容转写端点后重录',
+            )
+          }
+          if (body.answer.trim() === '') {
+            return fail('E_BAD_REQUEST', '转写结果为空：请重新录音，或改用文字作答')
+          }
+        }
+
         const answer = String(body.answer ?? '')
         if (answer.length > LIMITS.maxAnswerChars) {
           return fail('E_BAD_REQUEST', `答案超过 ${LIMITS.maxAnswerChars} 字符`)
@@ -192,7 +208,7 @@ export async function dispatch(request, deps = {}) {
           {
             questionId: item.id,
             answer,
-            inputMode: body.inputMode === 'voice' ? 'voice' : 'text',
+            inputMode,
             score,
             warnings,
             probe,
