@@ -1,4 +1,4 @@
-# 测试计划（G3）
+| TC-SES-007 | I | AC-7 |  →  回来的 plan 完全一致 | ✅ |# 测试计划（G3）
 
 > 依据 `docs/requirements/RC-001-mock-interview.md` 的 AC-1..AC-8 与 `docs/contracts.md` v1。
 > 命名：`TC-<域>-<三位号>`；层级：U=unit（纯逻辑）、I=integration（打真实 handler / 真实临时目录）、E=e2e（打包契约）。
@@ -61,7 +61,7 @@
 | TC-SCR-003 | U | AC-4 | `evidence` 为空 → 视为无效评分，重试一次 | 🟢 |
 | TC-SCR-004 | U | AC-4 | 两次都返回非 JSON → 抛 `E_SCORE_INVALID`，且**未**写入会话 | 🟢 |
 | TC-SCR-005 | U | AC-4 | 维度缺失一项 → 补 `null` 并标 `warnings`，不整体失败 | 🟢 |
-| TC-SCR-006 | I | AC-4 | `turn/answer` 端到端：作答后 `session.turns[0].score.dims` 六键齐全 | ⏭ 移至 S4（依赖会话存储与 dispatch 接线，与 TC-SES-007 同批） |
+| TC-SCR-006 | I | AC-4 | `turn/answer` 端到端：作答后 `session.turns[0].score.dims` 六键齐全 | ✅（S4 完成） |
 
 ### S2b 边界补齐（覆盖率用，非新功能）
 
@@ -97,11 +97,28 @@
 
 | ID | 层 | AC | 场景 | 状态 |
 |---|---|---|---|---|
-| TC-STO-001 | I | AC-7 | 写入 3 题后重开 `session/get` → 题数与分数完全一致 | ⬜ |
-| TC-STO-002 | I | AC-7 | 会话文件 `schemaVersion: 99` → `E_SCHEMA_VERSION`，不删原文件 | ⬜ |
-| TC-STO-003 | I | AC-7 | 写盘时目标目录不存在 → 自动创建；权限失败 → `E_EXPORT_FAILED` 不吞错 | ⬜ |
-| TC-STO-004 | I | AC-7 | 会话超 2 MB → `E_SESSION_TOO_LARGE`，原文件保持上一版 | ⬜ |
-| TC-STO-005 | I | AC-7 | `session/list` 按 `updatedAt` 倒序；`session/delete` 之后再 get → `E_SESSION_NOT_FOUND` | ⬜ |
+| TC-STO-001 | I | AC-7 | 写入 3 题后重开 `session/get` → 题数与分数完全一致 | ✅ |
+| TC-STO-002 | I | AC-7 | 会话文件 `schemaVersion: 99` → `E_SCHEMA_VERSION`，不删原文件 | ✅ |
+| TC-STO-003 | I | AC-7 | 写盘时目标目录不存在 → 自动创建；权限失败 → `E_EXPORT_FAILED` 不吞错 | ✅ |
+| TC-STO-004 | I | AC-7 | 会话超 2 MB → `E_SESSION_TOO_LARGE`，原文件保持上一版 | ✅ |
+| TC-STO-005 | I | AC-7 | `session/list` 按 `updatedAt` 倒序；`session/delete` 之后再 get → `E_SESSION_NOT_FOUND` | ✅ |
+
+**S4 转绿记录（2026-11-23，G4 第 26 轮）**：7 条一起转绿，提交 `9020c47`——`lib/store.mjs` 新建，
+`session/create`、`session/get`、`session/list`、`session/delete`、`turn/answer` 接进 `dispatch`，
+`ACTIONS` 从 1 个扩到 6 个（lint 的 ACTIONS ↔ switch 双向比对从此真正生效）。
+S4 收口时分支只有 **80.21%**（`store.mjs` 56.10%、`index.js` 81.82%），补 **S4b：TC-EDG-021..030**（`6b6abd1`）
+后回到 行 **99.74%** / 分支 **86.03%**。
+
+S4b 里两条值得单独说：
+- **TC-EDG-026** 用真实 `apply(ctx)` 装配（假 scope 提供 `webServer` + `llm.stream` 异步生成器），
+  从 `ctx.llm` 一路走到 `turn/answer` 落盘——这是「宿主 LLM 桥接能跑」的第一条可执行证据，
+  而不是只看 `lib/` 单测。
+- **TC-EDG-030** 让 `createStore` 接受注入的 `fs`，用 `EIO` 证明意外的 I/O 错误**原样上抛**，
+  不会被伪装成「会话不存在」——把「吞错」这条最危险的失败模式钉在测试里。
+
+**一处测试修正（不是放宽断言）**：`TC-CON-002` 原正则 `/^[a-z][a-z0-9-]*$/` 不允许 `session/create`
+这种带 `/` 的命名，与**已冻结的契约 §3**冲突（§3 里十个动作全是命名空间式）。已改为允许一段或多段
+`/` 分隔的小写标识；唯一性、非空、字典序三条断言一条没动。
 
 ### S5 报告与导出（AC-8）
 

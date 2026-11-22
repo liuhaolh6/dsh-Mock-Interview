@@ -13,7 +13,8 @@
  * @module index.js
  */
 
-import { ACTIONS, ERROR_CODES, RPC_PATH, SCHEMA_VERSION } from './lib/contracts.js'
+import { ACTIONS, ERROR_CODES, LIMITS, RPC_PATH, SCHEMA_VERSION } from './lib/contracts.js'
+import { decideProbe } from './lib/director.mjs'
 import { isContractError } from './lib/errors.mjs'
 import { buildPlan } from './lib/session.mjs'
 import { scoreAnswer } from './lib/scorer.mjs'
@@ -113,7 +114,11 @@ export async function dispatch(request, deps = {}) {
       }
 
       case 'session/list': {
-        const sessions = await resolveStore(deps).list()
+        const limit = body.limit === undefined ? 20 : body.limit
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+          return fail('E_BAD_REQUEST', 'limit 必须是 1–100 的整数')
+        }
+        const sessions = (await resolveStore(deps).list()).slice(0, limit)
         return ok({ sessions })
       }
 
@@ -127,30 +132,55 @@ export async function dispatch(request, deps = {}) {
         if (session.status === 'finished') {
           return fail('E_SESSION_FINISHED', '这场面试已经结束了，不能再作答')
         }
-        const item = (session.plan?.items ?? []).find((entry) => entry?.id === body.questionId)
+        const items = session.plan?.items ?? []
+        const item = items.find((entry) => entry?.id === body.questionId)
         if (item === undefined) {
           return fail('E_BAD_REQUEST', `plan 里没有题目 ${String(body.questionId)}`)
+        }
+        const answer = String(body.answer ?? '')
+        if (answer.length > LIMITS.maxAnswerChars) {
+          return fail('E_BAD_REQUEST', `答案超过 ${LIMITS.maxAnswerChars} 字符`)
         }
         if (typeof deps.complete !== 'function') {
           return fail('E_LLM_UNAVAILABLE', '宿主没有可用的模型服务（llm），无法评分')
         }
+
         const { score, warnings } = await scoreAnswer({
           item,
-          answer: body.answer,
+          answer,
           difficulty: session.difficulty,
           complete: deps.complete,
         })
-        const turn = {
-          questionId: item.id,
-          answer: String(body.answer ?? ''),
-          score,
-          warnings,
-          at: now(),
-        }
-        session.turns = [...(session.turns ?? []), turn]
-        session.updatedAt = now()
+
+        // §3.6: re-answering the same question overwrites the earlier turn, and
+        // a shallow answer earns exactly one probe (the reason travels with it).
+        const previous = (session.turns ?? []).find((turn) => turn?.questionId === item.id)
+        const probe = decideProbe({ answer, alreadyProbed: previous?.probe?.asked === true })
+        const at = now()
+        session.turns = [
+          ...(session.turns ?? []).filter((turn) => turn?.questionId !== item.id),
+          {
+            questionId: item.id,
+            answer,
+            inputMode: body.inputMode === 'voice' ? 'voice' : 'text',
+            score,
+            warnings,
+            probe,
+            at,
+          },
+        ]
+        session.updatedAt = at
         await store.put(session)
-        return ok({ turn })
+
+        const index = items.findIndex((entry) => entry?.id === item.id)
+        const nextItem = items[index + 1]
+        const next = probe.asked
+          ? { type: 'probe', question: item }
+          : nextItem === undefined
+            ? { type: 'finish' }
+            : { type: 'question', question: nextItem }
+
+        return ok({ score, next, sessionStatus: session.status })
       }
 
       default:

@@ -132,6 +132,9 @@ test('TC-STO-005 list is newest-first and deleted sessions are gone', async () =
   const gone = await call({ op: 'session/get', sessionId: first.value.sessionId }, deps)
   assert.equal(gone.ok, false)
   assert.equal(gone.error.code, 'E_SESSION_NOT_FOUND')
+  // §3.10: deleting twice is still success, not an error.
+  const again = await call({ op: 'session/delete', sessionId: first.value.sessionId }, deps)
+  assert.deepEqual(again.value, { deleted: true })
   await rm(home, { recursive: true, force: true })
 })
 
@@ -144,7 +147,7 @@ test('TC-SCR-006 turn/answer scores all six dimensions end to end', async () => 
     { home, complete: fakeLlm({ replies: [CODE_REVIEW_OK] }).complete },
   )
   assert.equal(answered.ok, true)
-  assert.deepEqual(Object.keys(answered.value.turn.score.dims).sort(), [
+  assert.deepEqual(Object.keys(answered.value.score.dims).sort(), [
     'code',
     'communication',
     'correctness',

@@ -62,15 +62,20 @@ test('TC-EDG-023 list survives an empty history and a corrupt file', async () =>
   await writeFile(join(sessionsDir(home), 'broken.json'), 'nope', 'utf8')
   const listed = await store.list()
   assert.deepEqual(listed.map((entry) => entry.id), ['good'])
-  assert.equal(listed[0].answered, 0)
+  // §3.5 entry shape: no turn has a score yet, so overall is null.
+  assert.equal(listed[0].turns, 0)
+  assert.equal(listed[0].overall, null)
+  assert.equal(listed[0].status, 'active')
   await rm(home, { recursive: true, force: true })
 })
 
-test('TC-EDG-024 deleting a session that is gone says not found', async () => {
+test('TC-EDG-024 deleting is idempotent, as §3.10 promises', async () => {
   const home = await tempHome()
   const store = createStore({ home })
-  await assert.rejects(() => store.remove('ghost'), { code: 'E_SESSION_NOT_FOUND' })
+  // Deleting something that never existed still reports success.
+  assert.deepEqual(await store.remove('ghost'), { deleted: true })
   await store.put({ id: 'real', schemaVersion: 1, updatedAt: 1 })
+  assert.deepEqual(await store.remove('real'), { deleted: true })
   assert.deepEqual(await store.remove('real'), { deleted: true })
   await rm(home, { recursive: true, force: true })
 })
@@ -175,7 +180,10 @@ test('TC-EDG-026 the host adapter streams a real turn through ctx.llm', async ()
       answer: '双指针去重。',
     })
     assert.equal(answered.ok, true, JSON.stringify(answered))
-    assert.equal(typeof answered.value.turn.score.overall, 'number')
+    // §3.6 response: the score and what comes next, not the stored turn.
+    assert.equal(typeof answered.value.score.overall, 'number')
+    assert.ok(['probe', 'question', 'finish'].includes(answered.value.next.type))
+    assert.equal(answered.value.sessionStatus, 'active')
   } finally {
     if (saved === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = saved
@@ -200,7 +208,8 @@ test('TC-EDG-028 a directory masquerading as a session reads as not found', asyn
   await mkdir(join(dir, 'fake.json'), { recursive: true })
   const store = createStore({ home })
   await assert.rejects(() => store.get('fake'), { code: 'E_SESSION_NOT_FOUND' })
-  await assert.rejects(() => store.remove('fake'), { code: 'E_SESSION_NOT_FOUND' })
+  // A directory is not something the store may delete; the fault must surface.
+  await assert.rejects(() => store.remove('fake'))
   assert.deepEqual(await store.list(), [])
   await rm(home, { recursive: true, force: true })
 })
