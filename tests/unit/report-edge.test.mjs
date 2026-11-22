@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import test from 'node:test'
 
 import { DIMENSIONS } from '../../lib/contracts.js'
@@ -57,12 +57,13 @@ test('TC-EDG-041 a directory or file that refuses to be written is an export fai
   })
 })
 
-test('TC-EDG-042 the default directory is used, absolute paths inside cwd pass, outside ones do not', () => {
+test('TC-EDG-042 relative paths stay inside the working directory, absolute ones are taken as given', () => {
   const cwd = 'D:/project/06-temp'
   assert.equal(resolveExportDir(undefined, cwd), join(cwd, 'interview-reports'))
   assert.equal(resolveExportDir(join(cwd, 'out'), cwd), join(cwd, 'out'))
   assert.throws(() => resolveExportDir('..', cwd), { code: 'E_BAD_REQUEST' })
-  assert.throws(() => resolveExportDir('C:/Windows', cwd), { code: 'E_BAD_REQUEST' })
+  // An absolute path is the user's own choice of export directory (contract §3.9).
+  assert.equal(resolveExportDir('C:/Windows/Temp', cwd), resolve('C:/Windows/Temp'))
   assert.throws(() => resolveExportDir('.', cwd), { code: 'E_BAD_REQUEST' })
 })
 

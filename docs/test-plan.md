@@ -323,3 +323,13 @@ RPC 跑在 Web 服务进程里，**不继承启动它的 shell 的环境变量**
 | TC-VOI-002 | 手工 | AC-5 | 点「语音作答」不假装录音，直接提示「未配置 ASR，请改用文字」；「朗读题目」走浏览器 speechSynthesis | 待真机点验 |
 
 ACTIONS 十项全部有实现；UI 侧不重复计算分数，只渲染宿主给的 score/report（契约 §2.1 规定）。
+
+### S7 返修（2026-11-23，真机点验后）
+
+| 用例 | 层 | 场景 | 状态 |
+|---|---|---|---|
+| TC-REP-008 | U | 雷达只聚合适用维度：八股题的 `project`/`code` 分不进报告短板 | ✅ |
+| TC-REP-001/002 | U | 期望值按适用维度口径手算重写（correctness (4+3)/2=3.5、project 只算项目题=5、code 未考察=null） | ✅ |
+| TC-EDG-042 | U | 相对路径越界拒绝、绝对路径按用户指定直接使用 | ✅ |
+| TC-REP-004 | I | 绝对导出目录成功落盘（此前误判 `E_BAD_REQUEST`） | ✅ |
+| TC-RPC-008 | I | `code/review` 的 `verdict` 与 `cases` 矛盾时给 warning，`verdict` 不改写 | ✅ |

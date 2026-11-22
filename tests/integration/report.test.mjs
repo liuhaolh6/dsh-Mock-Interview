@@ -45,8 +45,11 @@ test('TC-REP-004 export stays inside the working directory and never overwrites'
   // Outside the working directory is refused before any file is written.
   const escaped = await call({ op: 'report/export', sessionId, dir: '../..' }, deps)
   assert.equal(escaped.error.code, 'E_BAD_REQUEST')
-  const absolute = await call({ op: 'report/export', sessionId, dir: 'C:/Windows/Temp' }, deps)
-  assert.equal(absolute.error.code, 'E_BAD_REQUEST')
+  // An absolute path is an explicit destination the user picked (contract
+  // §3.9), so it is written there rather than judged against the session cwd.
+  const absolute = await call({ op: 'report/export', sessionId, dir: 'D:/project/06-temp/report-export-check' }, deps)
+  assert.equal(absolute.ok, true, JSON.stringify(absolute))
+  assert.match(absolute.value.path.replaceAll('\\', '/'), /^D:\/project\/06-temp\/report-export-check\/.*\.md$/)
 
   const first = await call({ op: 'report/export', sessionId, dir: './interview-reports' }, deps)
   assert.equal(first.ok, true, JSON.stringify(first))

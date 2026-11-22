@@ -104,3 +104,40 @@ test('TC-RPC-007 code/review reviews without executing and never carries a verdi
     await rm(home, { recursive: true, force: true })
   }
 })
+test('TC-RPC-008 code/review flags a verdict that contradicts its own cases', async () => {
+  const home = await tempHome()
+  try {
+    const created = await call(
+      { op: 'session/create', profile: PROFILE_CONFIRMED, mode: 'tech-1', difficulty: 'mid', minutes: 15 },
+      { home },
+    )
+    const codeItem = created.value.plan.items.find((item) => item.kind === 'code')
+    const contradictory = JSON.stringify({
+      verdict: 'presumed-wrong',
+      cases: Array.from({ length: 5 }, (_, i) => ({ input: `n=${i}`, expected: 'ok', actual: 'ok', ok: true })),
+      dims: { correctness: 5, depth: 4, structure: 4, project: 0, code: 5, communication: 4 },
+      evidence: ['考生写了递归阶乘'],
+      missing: [],
+      reference: [],
+    })
+    const reviewed = await call(
+      {
+        op: 'code/review',
+        sessionId: created.value.sessionId,
+        questionId: codeItem.id,
+        language: 'java',
+        code: 'int f(int n) { return n <= 1 ? 1 : n * f(n - 1); }',
+      },
+      { home, complete: fakeLlm({ replies: [contradictory] }).complete },
+    )
+    assert.equal(reviewed.ok, true, JSON.stringify(reviewed))
+    assert.equal(reviewed.value.verdict, 'presumed-wrong', 'the model verdict is kept, not rewritten')
+    assert.equal(
+      reviewed.value.warnings.some((warning) => warning.includes('不一致')),
+      true,
+      JSON.stringify(reviewed.value.warnings),
+    )
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
+})
