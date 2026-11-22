@@ -310,3 +310,16 @@ RPC 跑在 Web 服务进程里，**不继承启动它的 shell 的环境变量**
 4. `E_SCORE_INVALID`（11 s，真调了模型）：推理模型的 `reasoning-delta` 被当答案拼进来、且没给 `maxTokens`，预算被思考吃满 → 空文本。现只拼 `text-delta`、显式 `maxTokens: 4096`、`max-tokens` 映射为截断错误，系统指令额外以首条 user 消息下发。
 
 教训：错误耗时是判据——<20 ms 说明没走新代码或本地短路，>1 s 才是真的调模型；每次 host 改动都必须重启 Web 端。
+
+## S7 页面接线（2026-11-23）
+
+页面从 G1 骨架换成三步向导：setup（粘简历+JD、选时长/类型/难度）→ confirm（可编辑画像，技能逗号分隔、项目一行一个）→ run（逐题作答、六维卡片、手撕走 code/review、最后 session/finish 出报告）→ report（导出 Markdown）。
+
+| 用例 | 层 | 验收 | 场景 | 状态 |
+|---|---|---|---|---|
+| TC-RPC-006 | I | AC-1 | profile/extract 把粘贴文本变成可编辑画像；全空 → E_BAD_REQUEST 且不调模型 | ✅ |
+| TC-RPC-007 | I | AC-6 | code/review：executed:false、cases 恒 5、空代码 unverifiable、超长 E_BAD_REQUEST、无会话 E_SESSION_NOT_FOUND | ✅ |
+| TC-REP-007 | I | AC-8 | 调用方未指定目录时，报告落在部署默认工作目录（workingDirectory.defaultDirectory），而不是宿主进程 cwd | ✅ |
+| TC-VOI-002 | 手工 | AC-5 | 点「语音作答」不假装录音，直接提示「未配置 ASR，请改用文字」；「朗读题目」走浏览器 speechSynthesis | 待真机点验 |
+
+ACTIONS 十项全部有实现；UI 侧不重复计算分数，只渲染宿主给的 score/report（契约 §2.1 规定）。

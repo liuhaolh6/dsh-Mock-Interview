@@ -2,7 +2,7 @@
 
 DeepSeek Harness 插件：**模拟技术面试官**。把简历和目标岗位喂进去，它会按真实面试的节奏连问你——八股、简历项目深挖、手撕代码、行为面——支持文字和语音作答，每题给分并指出「哪句答错、缺什么、怎么补」，最后导出一份可复盘的 Markdown 报告。
 
-> 当前状态：**G4 进行中（切片 S1–S6 已全绿，S6b 真机返修已通过）**。G1 骨架与挂载、G2 契约、G3 红基线均已收口；剩 S7 页面接线（把 `client.js` 从骨架换成真正的面试界面）。
+> 当前状态：**G4 进行中（切片 S1–S7 已全绿，S6b 真机返修已通过）**。页面已从骨架换成三步向导（录入 → 确认画像 → 逐题作答与报告），待真机点一遍。
 > 已实现：`lib/profile.mjs`（简历+JD → 画像）、`lib/session.mjs`（按时长定额、按本人技能/项目定靶、题库补足不重复）、
 > `lib/director.mjs`（按难度定措辞、结论式回答追问一次）、`lib/scorer.mjs`（六维评分 + 越界钳制 + 无证据重试 + 空答 0 分）、
 > `lib/store.mjs`（原子写、2 MB 写前拦截）、`lib/report.mjs`（六维雷达 + Top3 短板 + Markdown 导出），
@@ -56,8 +56,8 @@ Node `v24.20.0` / npm `11.19.0` 下实跑（每列都是当轮实测输出，不
 |---|---|---|---|---|
 | `npm install` | 0 依赖，无报错 | 同上 | 同上 | 同上 |
 | `npm run build` | 3 个入口语法通过 | 通过 | 通过 | 通过 |
-| `npm run lint` | 0 error / 0 warning，7 文件 | 0 error / 0 warning，13 文件 | 0 error / 0 warning，29 文件 | `0 error(s), 0 warning(s), 32 file(s) scanned` |
-| `npm test` | 14 passed | 19 passed / 12 failed（预期红） | 106 passed | **114 passed / 0 failed / 0 skipped** |
+| `npm run lint` | 0 error / 0 warning，7 文件 | 0 error / 0 warning，13 文件 | 0 error / 0 warning，29 文件 | `0 error(s), 0 warning(s), 33 file(s) scanned` |
+| `npm test` | 14 passed | 19 passed / 12 failed（预期红） | 106 passed | **117 passed / 0 failed / 0 skipped** |
 | `npm run e2e` | 6 passed | 6 passed | 6 passed | **6 passed** |
 | `npm run coverage` | 行 98.77% / 分支 87.80% | 行 99.18% / 分支 88.89%（桩函数被调用即计覆盖，不可作依据） | 行 99.87% / 分支 87.87% | **行 98.78% / 分支 85.85%**（`index.js` 新增分支未全测，仍在门槛上） |
 

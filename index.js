@@ -205,7 +205,7 @@ export async function dispatch(request, deps = {}) {
         const exported = await exportReport({
           report,
           dir: body.dir,
-          cwd: typeof deps.cwd === 'string' && deps.cwd !== '' ? deps.cwd : process.cwd(),
+          cwd: exportBase(deps),
         })
         return ok(exported)
       }
@@ -497,6 +497,23 @@ export function dshHome(scope) {
  *
  * @param {object} ctx Cordis context
  */
+// Reports belong somewhere the user can find them. The browser half may pass
+// `dir`; otherwise the host prefers the deployment's default working directory
+// (a Session-shaped `process.cwd()` is the last resort, and only inside it).
+function exportBase(deps) {
+  const candidates = [deps.cwd, deps.defaultDir]
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim() !== '') return candidate
+  }
+  return process.cwd()
+}
+
+function defaultDir(scope) {
+  const service = scope.get('workingDirectory')
+  const value = service?.defaultDirectory
+  return typeof value === 'string' ? value : undefined
+}
+
 export function apply(ctx) {
   ctx.inject(['webServer'], (scope) => {
     const server = scope.get('webServer')
@@ -509,7 +526,8 @@ export function apply(ctx) {
         server.register({
           kind: 'exact',
           path: RPC_PATH,
-          handler: (req, res) => handle(req, res, { complete, home: dshHome(scope) }),
+          handler: (req, res) =>
+            handle(req, res, { complete, home: dshHome(scope), defaultDir: defaultDir(scope) }),
         }),
       'dsh-mock-interview: interview api',
     )

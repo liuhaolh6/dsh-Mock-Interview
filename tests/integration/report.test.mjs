@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
@@ -95,4 +96,20 @@ test('TC-REP-006 finishing a session that does not exist is a clean 404', async 
   const payload = await call({ op: 'session/finish', sessionId: 'ghost' }, { home: join(cwd, 'home'), cwd })
   assert.equal(payload.error.code, 'E_SESSION_NOT_FOUND')
   await rm(cwd, { recursive: true, force: true })
+})
+test('TC-REP-007 a report goes to the deployment default directory when the caller does not choose one', async () => {
+  const home = await tempCwd()
+  const base = await tempCwd()
+  try {
+    const created = await call(START, { home })
+    const sessionId = created.value.sessionId
+    const exported = await call({ op: 'report/export', sessionId }, { home, defaultDir: base })
+    assert.equal(exported.ok, true, JSON.stringify(exported))
+    const normalise = (value) => value.replaceAll('\\', '/')
+    assert.equal(normalise(exported.value.path).startsWith(normalise(base)), true, exported.value.path)
+    assert.equal(existsSync(exported.value.path), true)
+  } finally {
+    await rm(home, { recursive: true, force: true })
+    await rm(base, { recursive: true, force: true })
+  }
 })
