@@ -20,6 +20,8 @@
 | LLM 超时 | 45 s（`LIMITS.llmTimeoutMs`）；重试一次后仍失败 → `E_LLM_TIMEOUT` |
 | 幂等 | 只有 `ping`、`session/get`、`session/list`、`report/export`（相同路径重复导出覆盖同名文件）可重复调用；其余动作每调用一次都产生新状态 |
 
+**2 MB 会话上限的依据**（2026-11-23 估算，非拍脑袋）：45 分钟档最多 13 题，最坏情况 = 3 道手撕各 20 000 字 + 10 道口头作答各 4 000 字（52 000）+ 13 份评分卡各 1 600 字（20 800）+ 15 条边界用例推演（3 900）+ 画像/计划/报告等元数据（12 000）≈ **136 700 字符**；中文按 UTF-8 三字节计 ≈ 0.39 MB，叠加 JSON 结构与转义 35% ≈ **0.53 MB**，即 2 MB 仍有 **≈3.8 倍**余量。全会话上限只用于拦「异常膨胀」（例如模型把整段上下文回吐进答案），正常使用不会触发。
+
 ## 2. 数据结构
 
 ```jsonc
@@ -69,7 +71,7 @@
 ### 3.2 `profile/extract`
 - 请求：`{ "op": "profile/extract", "resumeText": "…", "jdText": "…" | "jd": {title, company, level} }`
 - 响应：`{ "profile": Profile, "warnings": ["…"] }`
-- 失败：`E_BAD_REQUEST`（两处输入皆空 / 超长）、`E_LLM_UNAVAILABLE`、`E_LLM_TIMEOUT`、`E_SCORE_INVALID`（模型输出不可解析且重试失败）。
+- 失败：`E_BAD_REQUEST`（两处输入皆空 / 超长）、`E_LLM_UNAVAILABLE`、`E_LLM_TIMEOUT`、`E_PROFILE_INVALID`（模型输出两次都不可解析为画像）。
 - 边界：简历纯空白、JD 只给岗位名、简历含乱码 → 追加 `warnings`，仍返回可编辑画像（`skills` 可为空数组）。
 - 幂等：否（同一输入两次抽取可能措辞不同；由用户在确认页定稿）。
 
@@ -132,6 +134,7 @@
 | `E_INTERNAL` | 未预期异常（500） | 视情况 | 显示 "出错并已记录"，不暴露栈 |
 | `E_SCHEMA_VERSION` | 会话文件版本高于插件 | 否 | 提示升级插件，拒绝加载 |
 | `E_PROFILE_INCOMPLETE` | 画像无技能且无项目 | 否 | 跳回画像确认页 |
+| `E_PROFILE_INVALID` | 模型两次都没吐出可解析的画像 JSON | 是 | 「重新解析」按钮 |
 | `E_SESSION_NOT_FOUND` | 会话 id 不存在 | 否 | 返回会话列表 |
 | `E_SESSION_FINISHED` | 已结束会话继续作答 | 否 | 跳报告页 |
 | `E_SESSION_TOO_LARGE` | 会话 > 2 MB | 否 | 提示结束当前会话并导出 |
