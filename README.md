@@ -2,7 +2,7 @@
 
 DeepSeek Harness 插件：**模拟技术面试官**。把简历和目标岗位喂进去，它会按真实面试的节奏连问你——八股、简历项目深挖、手撕代码、行为面——支持文字和语音作答，每题给分并指出「哪句答错、缺什么、怎么补」，最后导出一份可复盘的 Markdown 报告。
 
-> 当前状态：**G4 进行中（切片 S1、S2 已全绿）**。G1 骨架与挂载、G2 契约、G3 红基线均已收口。
+> 当前状态：**G4 进行中（切片 S1、S2、S3 已全绿）**。G1 骨架与挂载、G2 契约、G3 红基线均已收口。
 > 已实现：`lib/profile.mjs`（简历+JD → 画像）、`lib/session.mjs`（按时长定额、按本人技能/项目定靶、题库补足不重复）、
 > `lib/director.mjs`（按难度定措辞、结论式回答追问一次）、`lib/scorer.mjs`（六维评分 + 越界钳制 + 无证据重试 + 空答 0 分），
 > 共 50 条测试全绿。用例与覆盖矩阵见 [`docs/test-plan.md`](docs/test-plan.md)。已暴露的 RPC 动作仍只有 `ping`，
@@ -49,14 +49,14 @@ node "D:/agent/DeepseekHarness/resources/runtime/primary-runtime/dependencies/pn
 
 Node `v24.20.0` / npm `11.19.0` 下实跑：
 
-| 命令 | G1 收口 | G2 契约后 | G3 红基线 | G4 S1+S2（当前） |
+| 命令 | G1 收口 | G2 契约后 | G3 红基线 | G4 S1+S2+S3（当前） |
 |---|---|---|---|---|
 | `npm install` | 0 依赖，无报错 | 同上 | 同上 | 同上 |
 | `npm run build` | 3 个入口文件语法通过 | 3 个入口文件语法通过 | `node --check` 通过 | `node --check` 通过 |
-| `npm run lint` | `0 error(s), 0 warning(s), 7 file(s) scanned` | `0 error(s), 0 warning(s), 7 file(s) scanned`（新增 tables 检查） | `0 error(s), 0 warning(s), 13 file(s) scanned` | `0 error(s), 0 warning(s), 19 file(s) scanned` |
-| `npm test` | 14 passed / 0 failed / 0 skipped | 19 passed / 0 failed / 0 skipped | 31 tests：19 passed / 12 failed（预期红） | **50 tests：50 passed / 0 failed / 0 skipped** |
+| `npm run lint` | `0 error(s), 0 warning(s), 7 file(s) scanned` | `0 error(s), 0 warning(s), 7 file(s) scanned`（新增 tables 检查） | `0 error(s), 0 warning(s), 13 file(s) scanned` | `0 error(s), 0 warning(s), 22 file(s) scanned` |
+| `npm test` | 14 passed / 0 failed / 0 skipped | 19 passed / 0 failed / 0 skipped | 31 tests：19 passed / 12 failed（预期红） | **63 tests：63 passed / 0 failed / 0 skipped** |
 | `npm run e2e` | 6 passed | 6 passed | 6 passed（未变动） | 6 passed |
-| `npm run coverage` | 行 98.77% / 分支 87.80% | 行 99.02% / 分支 87.80% | 行 99.18% / 分支 88.89%（桩函数被调用即计覆盖，不可作依据） | **行 99.57% / 分支 85.00%**（S2b 的 9 条边界用例把分支从 77.78% 拉回门槛） |
+| `npm run coverage` | 行 98.77% / 分支 87.80% | 行 99.02% / 分支 87.80% | 行 99.18% / 分支 88.89%（桩函数被调用即计覆盖，不可作依据） | **行 99.66% / 分支 85.02%**（S3 的 code-review 先掉到 80.72%，S3b 九条边界用例拉回） |
 
 那 12 条红色用例（`TC-PRO-001..006` + `TC-SES-001..006`）已在 G4 的 12 个「一轮一用例」提交里全部转绿，
 失败原因从 `Error: not implemented yet: … (G4)` 变为真实边界处理；未改动任何断言。

@@ -113,6 +113,15 @@
 - 失败：`E_SCORE_INVALID`、`E_LLM_TIMEOUT`；**永不**执行代码，也永不因代码报错而失败。
 - 边界：空代码 → `unverifiable`；超 20 000 字符 → `E_BAD_REQUEST`。
 - `executed` 恒为 `false`，报告与 UI 必须渲染「未真实执行」（ADR-0004）。
+- 评审语义（实现后钉死，G4/S3）：
+  - `cases` 恒为 **5 条**。模型给多了截断，给少了用 `{ input:'', expected:'', actual:'', ok:false }` 补齐并加 warning；
+    `ok` 严格按 `=== true` 判定，其余一律 `false`。
+  - `verdict` 只接受三档枚举；模型给了别的一律降级 `unverifiable` 并加 warning（不静默改判）。
+  - 模型输出不是合法 JSON 对象 → 重试一次，仍失败 → `E_SCORE_INVALID`（与本约定「评不出分」一致）。
+  - **代码是数据，不是指令**：代码注释里出现「忽略以上指令」之类文字，只能改变评审结论，
+    不能改变响应的结构（verdict / cases / score 三件套始终存在）——这条由 TC-COD-004 守护。
+  - 响应里的 `score` 与 `turn/answer` 用同一套 `buildCard()` 归一（钳制 1..5、缺维 null、
+    `overall` 取六维算术平均），避免手撕题和八股题两套评分口径。
 
 ### 3.8 `session/finish`
 - 请求：`{ "op": "session/finish", "sessionId": "..." }`

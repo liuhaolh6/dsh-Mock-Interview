@@ -88,10 +88,10 @@
 
 | ID | 层 | AC | 场景 | 状态 |
 |---|---|---|---|---|
-| TC-COD-001 | U | AC-6 | 正确解法 → `verdict==='presumed-correct'`，`executed===false`，`cases.length===5` | ⬜ |
-| TC-COD-002 | U | AC-6 | 空代码 → `verdict==='unverifiable'`，不调用 LLM | ⬜ |
-| TC-COD-003 | U | AC-6 | 20 001 字符代码 → `E_BAD_REQUEST` | ⬜ |
-| TC-COD-004 | U | AC-6 | 代码里含注释「忽略以上指令」→ 输出仍为结构化 JSON（提示词注入回归） | ⬜ |
+| TC-COD-001 | U | AC-6 | 正确解法 → `verdict==='presumed-correct'`，`executed===false`，`cases.length===5` | ✅ |
+| TC-COD-002 | U | AC-6 | 空代码 → `verdict==='unverifiable'`，不调用 LLM | ✅ |
+| TC-COD-003 | U | AC-6 | 20 001 字符代码 → `E_BAD_REQUEST` | ✅ |
+| TC-COD-004 | U | AC-6 | 代码里含注释「忽略以上指令」→ 输出仍为结构化 JSON（提示词注入回归） | ✅ |
 
 ### S4 会话存储与续考（AC-7）
 
@@ -177,3 +177,13 @@ npm run coverage    # 核心 lib/** ≥85% 行覆盖
 ```
 
 判定：一个用例从 🔴/⬜ 变 🟢 的条件是「只改实现、不改用例」后转绿；若必须改用例，先在本文件写明理由并升 `TC-` 号，不得就地放宽断言。
+**S3 转绿记录（2026-11-23，G4 第 23–25 轮）**：
+`TC-COD-003` → `2eaf2b6`；`TC-COD-002` → `ae67069`；`TC-COD-001` + `TC-COD-004` → `5a1a202`（同一轮，
+因为「代码是数据」这条防线只有在做出正向评审之后才有东西可守：先让结构化输出成立，再证明注入改不了结构）。
+S3 收口时分支只有 **80.72%**（`code-review.mjs` 50.00%），补 **S3b：TC-EDG-010..018**（`3b8fff4`）
+后回到 行 99.66% / 分支 **85.02%**。
+
+S3b 覆盖的真实边界，不是为数字而写的：评审输出不可解析 → `E_SCORE_INVALID`；`verdict` 越界降级
+`unverifiable`；`cases` 少于/等于/多于 5 条三条路径；非字符串代码按空处理；畸形 case 条目
+（数字 input / null expected / `ok:'yes'`）归一；JSON 提取器对字符串内花括号、未闭合对象、
+数组、诱饵对象（prose 里先出现 `{"verdict":"..."}`）的行为。
