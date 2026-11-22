@@ -2,7 +2,7 @@
 
 DeepSeek Harness 插件：**模拟技术面试官**。把简历和目标岗位喂进去，它会按真实面试的节奏连问你——八股、简历项目深挖、手撕代码、行为面——支持文字和语音作答，每题给分并指出「哪句答错、缺什么、怎么补」，最后导出一份可复盘的 Markdown 报告。
 
-> 当前状态：**G1 工程骨架**。已具备：侧边栏入口 + 独立面试页 + host/client 双半 + RPC 契约 + `ping` 连通性自检。面试流程按 `docs/test-plan.md` 逐用例实现。
+> 当前状态：**G2 契约**。G1 已收口（骨架 + 挂载 + 活体 RPC 实测）。契约见 [`docs/contracts.md`](docs/contracts.md)：传输约定、`Profile`/`Plan`/`Turn`/`ScoreCard`/`Report`/`Session` 数据结构、10 个动作与 13 个错误码。已实现的动作只有 `ping`，其余按 `docs/test-plan.md` 逐用例落地。
 
 ## 为什么要有它
 
@@ -42,20 +42,24 @@ node "D:/agent/DeepseekHarness/resources/runtime/primary-runtime/dependencies/pn
 | `npm run e2e` | 打包契约 e2e |
 | `npm run coverage` | 覆盖率，核心 `lib/**` ≥ 85% 否则失败 |
 
-## 验证状态（2026-11-23，G1）
+## 验证状态（2026-11-23）
 
 Node `v24.20.0` / npm `11.19.0` 下实跑：
 
-| 命令 | 结果 |
-|---|---|
-| `npm install` | 0 依赖，无报错 |
-| `npm run build` | 3 个入口文件语法通过 |
-| `npm run lint` | `0 error(s), 0 warning(s), 7 file(s) scanned` |
-| `npm test` | 14 passed / 0 failed / 0 skipped |
-| `npm run e2e` | 6 passed |
-| `npm run coverage` | 行 98.77% / 分支 87.80%（`index.js` 与 `lib/**`） |
+| 命令 | G1 收口 | G2 契约后（当前） |
+|---|---|---|
+| `npm install` | 0 依赖，无报错 | 同上 |
+| `npm run build` | 3 个入口文件语法通过 | 3 个入口文件语法通过 |
+| `npm run lint` | `0 error(s), 0 warning(s), 7 file(s) scanned` | `0 error(s), 0 warning(s), 7 file(s) scanned`（新增 tables 检查） |
+| `npm test` | 14 passed / 0 failed / 0 skipped | 19 passed / 0 failed / 0 skipped |
+| `npm run e2e` | 6 passed | 6 passed |
+| `npm run coverage` | 行 98.77% / 分支 87.80% | 行 99.02% / 分支 87.80% |
 
-**未验证**：活体装载（link 进 profile 后重启 Web 端、侧栏图标出现、页面能打开）——这一步需要重启 DSH，尚未执行，因此 G1 门禁的「页面能打开」仍待现场确认。
+**活体验证（已通过）**：插件以 `link:` 装入 `profiles/desktop` 并出现在 `dsh.profile.bundles` 后重启 Web 端，侧栏图标出现、页面可打开；
+`POST /api/dsh-mock-interview/rpc {"op":"ping"}` → `{"ok":true,"value":{"pong":true,"version":"0.1.0","schemaVersion":1}}`（HTTP 200）；
+`{"op":"nope"}` → `{"ok":false,"error":{"code":"E_UNKNOWN_ACTION"}}`（HTTP 200）。
+
+**未验证**：G3 起的面试流程（画像抽取、出题、评分、报告），当前页面只有连通性自检。
 
 ## 结构
 

@@ -59,7 +59,7 @@ if (errors.length === 0) note(passed, `syntax: ${sources.length} modules parsed`
 /* 2. contract table vs dispatch ------------------------------------------- */
 
 const contracts = await import(new URL('../lib/contracts.js', import.meta.url))
-const { ACTIONS, ERROR_CODES, RPC_PATH } = contracts
+const { ACTIONS, DIMENSIONS, DURATIONS, ERROR_CODES, MODES, PLANNED_ERROR_CODES, RPC_PATH } = contracts
 
 const indexSource = readFileSync(join(ROOT, 'index.js'), 'utf8')
 const caseNames = new Set([...indexSource.matchAll(/case\s+'([^']+)'\s*:/g)].map((match) => match[1]))
@@ -82,6 +82,27 @@ for (const code of usedCodes) {
 }
 for (const code of Object.keys(ERROR_CODES)) {
   if (!usedCodes.has(code)) note(warnings, `error code: "${code}" declared but never returned yet`)
+}
+
+/* 3b. tables (G2) --------------------------------------------------------- */
+
+const docSource = readFileSync(join(ROOT, 'docs', 'contracts.md'), 'utf8')
+for (const code of PLANNED_ERROR_CODES) {
+  if (!docSource.includes(code)) note(errors, `tables: planned code "${code}" is missing from docs/contracts.md`)
+  if (Object.hasOwn(ERROR_CODES, code)) {
+    note(errors, `tables: "${code}" is both planned and implemented; delete the planned entry`)
+  }
+}
+for (const mode of MODES) {
+  if (!docSource.includes(mode)) note(warnings, `tables: mode "${mode}" is not mentioned in docs/contracts.md`)
+}
+const minutes = Object.keys(DURATIONS).map(Number)
+if (minutes.some((value) => !Number.isInteger(value) || value <= 0)) note(errors, 'tables: DURATIONS keys must be positive integers')
+if (Object.values(DURATIONS).some((value) => !Number.isInteger(value) || value <= 0)) note(errors, 'tables: DURATIONS budgets must be positive integers')
+if (new Set(DIMENSIONS).size !== DIMENSIONS.length) note(errors, 'tables: DIMENSIONS contains duplicates')
+if (DIMENSIONS.length === 0) note(errors, 'tables: DIMENSIONS is empty')
+if (errors.length === 0) {
+  note(passed, `tables: ${PLANNED_ERROR_CODES.length} planned code(s) documented, ${MODES.length} mode(s), ${DIMENSIONS.length} dimension(s)`)
 }
 
 const clientSource = readFileSync(join(ROOT, 'client.js'), 'utf8')
