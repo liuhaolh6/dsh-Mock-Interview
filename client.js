@@ -43,9 +43,12 @@ window.__ModuleLoader__.load({
         'mode.project': '项目深挖',
         'mode.algo': '算法手撕',
         'mode.behavior': '行为面',
+        'difficulty.junior': '初级',
+        'difficulty.mid': '中级',
+        'difficulty.senior': '高级',
         'confirm.title': '第二步：确认画像',
         'confirm.skills': '技能（用逗号分隔）',
-        'confirm.projects': '项目（每行一个：名称：一句话摘要）',
+        'confirm.projects': '项目（每行一个：名称：角色｜亮点｜亮点）',
         'confirm.level': '岗位级别',
         'confirm.warnings': '解析提示',
         'confirm.start': '开始面试',
@@ -103,7 +106,7 @@ window.__ModuleLoader__.load({
         'setup.difficulty': 'Difficulty',
         'confirm.title': 'Step 2 — confirm the profile',
         'confirm.skills': 'Skills (comma separated)',
-        'confirm.projects': 'Projects (one per line: name: summary)',
+        'confirm.projects': 'Projects (one per line: name: role | highlight | highlight)',
         'confirm.start': 'Start interview',
         'confirm.back': 'Back',
         'run.submit': 'Submit answer',
@@ -183,8 +186,8 @@ window.__ModuleLoader__.load({
         fontSize: '13px',
         padding: '7px 16px',
         borderRadius: '8px',
-        border: '1px solid var(--dsh-color-accent, #4c7dff)',
-        background: 'var(--dsh-color-accent, #4c7dff)',
+        border: '1px solid var(--dsw-alias-brand-primary, #4c7dff)',
+        background: 'var(--dsw-alias-brand-primary, #4c7dff)',
         color: '#fff',
         cursor: 'pointer',
       },
@@ -195,19 +198,58 @@ window.__ModuleLoader__.load({
         boxSizing: 'border-box',
         padding: '8px 10px',
         borderRadius: '8px',
-        border: '1px solid rgba(127,127,127,0.35)',
-        background: 'transparent',
-        color: 'inherit',
+        border: '1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35))',
+        background: 'var(--dsw-alias-bg-layer-1, #ffffff)',
+        color: 'var(--dsw-alias-label-primary, #1f2328)',
         resize: 'vertical',
+      },
+      select: {
+        font: 'inherit',
+        fontSize: '13px',
+        width: 'auto',
+        boxSizing: 'border-box',
+        padding: '8px 10px',
+        borderRadius: '8px',
+        border: '1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35))',
+        background: 'var(--dsw-alias-bg-layer-1, #ffffff)',
+        color: 'var(--dsw-alias-label-primary, #1f2328)',
+        colorScheme: 'light dark',
+        cursor: 'pointer',
+      },
+      option: {
+        background: 'var(--dsw-alias-bg-layer-1, #ffffff)',
+        color: 'var(--dsw-alias-label-primary, #1f2328)',
+      },
+      choiceRow: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
+      choice: {
+        font: 'inherit',
+        fontSize: '12px',
+        padding: '6px 12px',
+        borderRadius: '999px',
+        border: '1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.4))',
+        background: 'var(--dsw-alias-bg-layer-1, #ffffff)',
+        color: 'var(--dsw-alias-label-primary, #1f2328)',
+        cursor: 'pointer',
+      },
+      choiceOn: {
+        font: 'inherit',
+        fontSize: '12px',
+        padding: '6px 12px',
+        borderRadius: '999px',
+        border: '1px solid var(--dsw-alias-brand-primary, #4c7dff)',
+        background: 'var(--dsw-alias-brand-primary, #4c7dff)',
+        color: '#ffffff',
+        cursor: 'pointer',
+        fontWeight: 600,
       },
       prompt: { fontSize: '15px', lineHeight: 1.7, margin: '0 0 12px', whiteSpace: 'pre-wrap' },
       badge: { fontSize: '11px', padding: '2px 8px', borderRadius: '999px', border: '1px solid currentColor', opacity: 0.7 },
-      ok: { fontSize: '12px', color: 'var(--dsh-color-success, #1f9d55)' },
-      bad: { fontSize: '12px', color: 'var(--dsh-color-danger, #d14343)' },
+      ok: { fontSize: '12px', color: 'var(--dsw-alias-state-success-primary, #1f9d55)' },
+      bad: { fontSize: '12px', color: 'var(--dsw-alias-state-error-primary, #d14343)' },
       meta: { fontSize: '11px', opacity: 0.55 },
       dimRow: { display: 'grid', gridTemplateColumns: '84px 1fr 34px', alignItems: 'center', gap: '8px', fontSize: '12px' },
       bar: { height: '6px', borderRadius: '999px', background: 'rgba(127,127,127,0.2)', overflow: 'hidden' },
-      barFill: { height: '100%', background: 'var(--dsh-color-accent, #4c7dff)' },
+      barFill: { height: '100%', background: 'var(--dsw-alias-brand-primary, #4c7dff)' },
       list: { margin: 0, paddingLeft: '18px', fontSize: '13px', lineHeight: 1.9, opacity: 0.88 },
     }
 
@@ -239,15 +281,40 @@ window.__ModuleLoader__.load({
       )
     }
 
+    // Pills instead of a native popup: the option text must be readable in both
+    // light and dark themes, and the popup surface is not ours to style.
+    function Choice(props) {
+      return h(
+        'div',
+        { style: styles.choiceRow, role: 'group', 'aria-label': props.label ?? '' },
+        props.options.map((option) => {
+          const on = String(option.value) === String(props.value)
+          return h(
+            'button',
+            {
+              key: String(option.value),
+              type: 'button',
+              style: on ? styles.choiceOn : styles.choice,
+              'aria-pressed': on ? 'true' : 'false',
+              onClick: () => props.onChange(option.value),
+            },
+            option.label,
+          )
+        }),
+      )
+    }
+
     function Select(props) {
       return h(
         'select',
         {
-          style: { ...styles.input, width: 'auto' },
+          style: styles.select,
           value: props.value,
           onChange: (event) => props.onChange(event.target.value),
         },
-        props.options.map((option) => h('option', { key: option.value, value: option.value }, option.label)),
+        props.options.map((option) =>
+          h('option', { key: option.value, value: option.value, style: styles.option }, option.label),
+        ),
       )
     }
 
@@ -533,21 +600,24 @@ window.__ModuleLoader__.load({
               })),
             h('div', { style: styles.row },
               h(Field, { label: t('setup.minutes') },
-                h(Select, {
+                h(Choice, {
+                  label: t('setup.minutes'),
                   value: setup.minutes,
                   options: MINUTES.map((value) => ({ value, label: `${value} min` })),
                   onChange: (value) => setSetup({ ...setup, minutes: Number(value) }),
                 })),
               h(Field, { label: t('setup.mode') },
-                h(Select, {
+                h(Choice, {
+                  label: t('setup.mode'),
                   value: setup.mode,
                   options: MODES.map((value) => ({ value, label: t(`mode.${value}`) })),
                   onChange: (value) => setSetup({ ...setup, mode: value }),
                 })),
               h(Field, { label: t('setup.difficulty') },
-                h(Select, {
+                h(Choice, {
+                  label: t('setup.difficulty'),
                   value: setup.difficulty,
-                  options: DIFFICULTIES.map((value) => ({ value, label: value })),
+                  options: DIFFICULTIES.map((value) => ({ value, label: t(`difficulty.${value}`) })),
                   onChange: (value) => setSetup({ ...setup, difficulty: value }),
                 })),
             ),
