@@ -283,6 +283,15 @@ RPC 跑在 Web 服务进程里，**不继承启动它的 shell 的环境变量**
 修法：`apply(ctx)` 里用 `dshHome(scope)` 先取宿主服务 `dshHomePath`（与 `dsh-collections` 一致），
 环境变量只作回退；TC-WIR-006..008 把这个顺序钉死。**结论：每个切片收口都必须包含一次活体 RPC 调用，不能只信单元测试。**
 
+## S7 前置：把已有的两个 lib 接到 RPC（2026-11-23）
+
+| 用例 | 层 | 验收 | 场景 | 状态 |
+|---|---|---|---|---|
+| TC-RPC-006 | I | AC-1 | `profile/extract` 把粘贴的简历+JD 变成可编辑画像；全空输入 → `E_BAD_REQUEST` 且不调模型 | ✅ |
+| TC-RPC-007 | I | AC-6 | `code/review` 评审手撕题：`executed:false`、`cases` 恒 5 条、空代码 → `unverifiable`、超 20 000 字符 → `E_BAD_REQUEST`、会话不存在 → `E_SESSION_NOT_FOUND` | ✅ |
+
+`ACTIONS` 8 → **10**，契约里的十个动作全部有实现；`code/review` 与 `turn/answer` 共用 `buildCard`，落盘用同一 `questionId` 覆盖写。
+
 ## 评分口径变更（2026-11-23，用户裁决）
 
 活体回归发现「`code:0` 计入六维平均」会让非手撕题的理论上限只有 25/6 ≈ 4.2，且真机上把一次四平八稳的并发回答判成 `overall 2.2 / weak`。用户选择「只按适用维度平均」，据此改契约 §2.4 与 `lib/scorer.mjs`：

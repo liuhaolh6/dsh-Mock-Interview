@@ -17,8 +17,10 @@ import { basename, dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 
 import { ACTIONS, ERROR_CODES, LIMITS, RPC_PATH, SCHEMA_VERSION } from './lib/contracts.js'
+import { reviewCode } from './lib/code-review.mjs'
 import { decideProbe } from './lib/director.mjs'
 import { ContractError, isContractError } from './lib/errors.mjs'
+import { extractProfile } from './lib/profile.mjs'
 import { buildReport, exportReport } from './lib/report.mjs'
 import { buildPlan } from './lib/session.mjs'
 import { scoreAnswer } from './lib/scorer.mjs'
@@ -86,6 +88,58 @@ export async function dispatch(request, deps = {}) {
     switch (op) {
       case 'ping':
         return ok({ pong: true, version: VERSION, schemaVersion: SCHEMA_VERSION, at: now() })
+
+      case 'profile/extract': {
+        const { profile, warnings } = await extractProfile(
+          { resumeText: body.resumeText, jdText: body.jdText, jd: body.jd },
+          { complete: deps.complete },
+        )
+        return ok({ profile, warnings })
+      }
+
+      case 'code/review': {
+        const store = resolveStore(deps)
+        const session = await store.get(body.sessionId)
+        if (session.status === 'finished') {
+          return fail('E_SESSION_FINISHED', '这场面试已经结束了，不能再提交代码')
+        }
+        const items = session.plan?.items ?? []
+        const item = items.find((entry) => entry.id === body.questionId)
+        if (item === undefined) {
+          return fail('E_BAD_REQUEST', `题目 ${String(body.questionId)} 不在本场面试的题单里`)
+        }
+        if (item.kind !== 'code') {
+          return fail('E_BAD_REQUEST', '这道题不是手撕题，请用 turn/answer 作答')
+        }
+        const reviewed = await reviewCode({
+          item,
+          code: body.code,
+          language: body.language,
+          complete: deps.complete,
+        })
+        // Keep the report honest: the code turn carries the same card shape as
+        // a spoken answer, plus the code itself and the simulated cases.
+        session.turns = (session.turns ?? []).filter((turn) => turn.questionId !== item.id)
+        session.turns.push({
+          questionId: item.id,
+          answer: typeof body.code === 'string' ? body.code : '',
+          code: typeof body.code === 'string' ? body.code : '',
+          cases: reviewed.cases,
+          inputMode: 'code',
+          score: reviewed.score,
+          warnings: reviewed.warnings,
+          at: now(),
+        })
+        session.updatedAt = now()
+        await store.put(session)
+        return ok({
+          score: reviewed.score,
+          verdict: reviewed.verdict,
+          cases: reviewed.cases,
+          executed: reviewed.executed,
+          warnings: reviewed.warnings,
+        })
+      }
 
       case 'session/create': {
         const plan = await buildPlan({

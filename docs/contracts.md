@@ -42,7 +42,8 @@
 
 // Turn —— 一问一答（AC-3/4/6）
 { "questionId": "q1", "kind": "skill", "prompt": "…", "answer": "…",
-  "inputMode": "text|voice", "askedAt": 0, "answeredAt": 0,
+  "inputMode": "text|voice|code", "askedAt": 0, "answeredAt": 0,
+  "code": "只有 inputMode=code 才有", "cases": [{ "input": "", "expected": "", "actual": "", "ok": false }],
   "score": ScoreCard, "probe": { "asked": true, "reason": "回答只有结论" } }
 
 // ScoreCard —— 六维（AC-4）
@@ -151,6 +152,7 @@
 - 失败：`E_SCORE_INVALID`、`E_LLM_TIMEOUT`；**永不**执行代码，也永不因代码报错而失败。
 - 边界：空代码 → `unverifiable`；超 20 000 字符 → `E_BAD_REQUEST`。
 - `executed` 恒为 `false`，报告与 UI 必须渲染「未真实执行」（ADR-0004）。
+- 落盘：评审通过后覆盖写同 `questionId` 的 turn（`inputMode:"code"`、`answer` 与 `code` 都是代码原文、`cases` 一并存），保证报告口径与 `turn/answer` 一致；会话 `finished` → `E_SESSION_FINISHED`，题目不在题单 → `E_BAD_REQUEST`。
 - 评审语义（实现后钉死，G4/S3）：
   - `cases` 恒为 **5 条**。模型给多了截断，给少了用 `{ input:'', expected:'', actual:'', ok:false }` 补齐并加 warning；
     `ok` 严格按 `=== true` 判定，其余一律 `false`。
