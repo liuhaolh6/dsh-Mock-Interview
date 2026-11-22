@@ -133,8 +133,7 @@
   - 流结束但**文本为空** → `E_LLM_UNAVAILABLE`（否则下游只会报出令人误解的「评分 JSON 不可解析」）。
 - **消息形状**：adapter 只接受 `content` 为文本块数组的 `RequestMessage`；引擎侧写的是 `{ role, content: 字符串 }`，
   桥接层统一转成 `[{ type: "text", text }]`。assistant 历史需要模型来源元数据，插件不伪造，
-  因此「上一次的回复」以 `（你上一条回复）
-…` 的形式并入 user 消息重放。
+  因此「上一次的回复」以「（你上一条回复）」开头并入 user 消息重放，不让 adapter 去猜 assistant 的来源。
 
 - **只拼文本增量**：`text-delta` 的 `text`（兼容历史形状里的 `delta`/`content`）；`reasoning-delta` 不进答案。
 
