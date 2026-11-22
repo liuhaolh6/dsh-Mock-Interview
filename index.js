@@ -272,6 +272,24 @@ function llmBridge(scope) {
 }
 
 /**
+ * Where sessions live. The host exposes it as `dshHomePath`; a bare process
+ * env is only a fallback, because the web server does not inherit it.
+ *
+ * @param {object} scope Cordis scope with services
+ * @returns {string|undefined}
+ */
+export function dshHome(scope) {
+  try {
+    const value = scope?.get?.('dshHomePath')
+    if (typeof value === 'string' && value !== '') return value
+  } catch {
+    // Service not present: fall through to the environment.
+  }
+  const env = process.env.DSH_HOME
+  return typeof env === 'string' && env !== '' ? env : undefined
+}
+
+/**
  * Mount the endpoint on the host web server.
  *
  * @param {object} ctx Cordis context
@@ -280,11 +298,16 @@ export function apply(ctx) {
   ctx.inject(['webServer'], (scope) => {
     const server = scope.get('webServer')
     if (server === undefined || typeof server.register !== 'function') return
-    const deps = { complete: llmBridge(scope) }
+    const complete = llmBridge(scope)
     scope.effect(
       // The promise is returned so a test (and the server) can await the reply;
       // `handle` swallows its own errors, so it never rejects.
-      () => server.register({ kind: 'exact', path: RPC_PATH, handler: (req, res) => handle(req, res, deps) }),
+      () =>
+        server.register({
+          kind: 'exact',
+          path: RPC_PATH,
+          handler: (req, res) => handle(req, res, { complete, home: dshHome(scope) }),
+        }),
       'dsh-mock-interview: interview api',
     )
   })

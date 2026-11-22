@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import { apply, dispatch, RPC_PATH, VERSION } from '../../index.js'
 
@@ -54,7 +56,7 @@ test('TC-RPC-005 non-object JSON bodies are rejected', async () => {
 })
 
 /** Minimal Cordis scope stand-in: records the effect and exposes the server. */
-function fakeContext(server) {
+function fakeContext(server, services = {}) {
   const effects = []
   const routes = []
   const registeringServer = {
@@ -69,7 +71,7 @@ function fakeContext(server) {
     inject(deps, fn) {
       assert.deepEqual(deps, ['webServer'])
       fn({
-        get: (name) => (name === 'webServer' ? (server ?? registeringServer) : undefined),
+        get: (name) => (name === 'webServer' ? (server ?? registeringServer) : services[name]),
         effect: (factory, label) => {
           effects.push({ label, dispose: factory() })
         },
@@ -158,4 +160,28 @@ test('TC-WIR-005 a broken request stream answers 500 with E_INTERNAL', async () 
   const payload = JSON.parse(captured.body)
   assert.equal(payload.error.code, 'E_INTERNAL')
   assert.match(payload.error.message, /socket hang up/)
+})
+test('TC-WIR-006 the host service supplies DSH_HOME when the env does not', async () => {
+  const home = join(tmpdir(), 'dsh-mock-interview-wir-home')
+  const { ctx, routes } = fakeContext(undefined, { dshHomePath: home })
+  apply(ctx)
+  const { res, captured } = fakeResponse()
+  await routes[0].handler(fakeRequest([JSON.stringify({ op: 'session/list' })]), res)
+  const payload = JSON.parse(captured.body)
+  assert.equal(payload.ok, true, captured.body)
+  assert.deepEqual(payload.value.sessions, [])
+})
+
+test('TC-WIR-007 without a host service or env there is no home, and the request says so', async () => {
+  const saved = process.env.DSH_HOME
+  delete process.env.DSH_HOME
+  try {
+    const { ctx, routes } = fakeContext()
+    apply(ctx)
+    const { res, captured } = fakeResponse()
+    await routes[0].handler(fakeRequest([JSON.stringify({ op: 'session/list' })]), res)
+    assert.equal(JSON.parse(captured.body).error.code, 'E_BAD_REQUEST')
+  } finally {
+    if (saved !== undefined) process.env.DSH_HOME = saved
+  }
 })
