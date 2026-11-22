@@ -76,9 +76,14 @@ if (declared.size === caseNames.size) note(passed, `contract: ${declared.size} a
 
 /* 3. wiring --------------------------------------------------------------- */
 
-const usedCodes = new Set([...indexSource.matchAll(/(?:\bfail\(\s*'|\bcode:\s*')([A-Z_]+)'/g)].map((match) => match[1]))
+const libSources = walk(join(ROOT, 'lib'))
+  .filter((file) => file.endsWith('.mjs'))
+  .map((file) => readFileSync(file, 'utf8'))
+  .join('\n')
+const codeUseSource = `${indexSource}\n${libSources}`
+const usedCodes = new Set([...codeUseSource.matchAll(/(?:\bfail\(\s*'|\bcode:\s*'|\bContractError\(\s*')([A-Z_]+)'/g)].map((match) => match[1]))
 for (const code of usedCodes) {
-  if (!Object.hasOwn(ERROR_CODES, code)) note(errors, `error code: "${code}" used in index.js but missing from ERROR_CODES`)
+  if (!Object.hasOwn(ERROR_CODES, code)) note(errors, `error code: "${code}" used in index.js/lib but missing from ERROR_CODES`)
 }
 for (const code of Object.keys(ERROR_CODES)) {
   if (!usedCodes.has(code)) note(warnings, `error code: "${code}" declared but never returned yet`)
