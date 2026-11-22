@@ -8,12 +8,13 @@ import { CODE_REVIEW_OK, ITEM_CODE } from '../fixtures/code.mjs'
 
 // S3b: the branches the four functional cases do not reach.
 
-test('TC-EDG-010 an unparseable review is a contract error, not a crash', async () => {
-  const llm = fakeLlm({ replies: ['抱歉，我无法评审这段代码。'] })
+test('TC-EDG-010 two unparseable reviews end in E_SCORE_INVALID after one retry', async () => {
+  const llm = fakeLlm({ replies: ['抱歉，我无法评审这段代码。', '还是不行，抱歉。'] })
   await assert.rejects(
     () => reviewCode({ item: ITEM_CODE, code: 'x = 1', language: 'javascript', complete: llm.complete }),
     { code: 'E_SCORE_INVALID' },
   )
+  assert.equal(llm.calls.length, 2)
 })
 
 test('TC-EDG-011 an unknown verdict degrades to unverifiable with a warning', async () => {
@@ -97,4 +98,27 @@ test('TC-EDG-018 extra cases are truncated to five and a missing language is lab
   const result = await reviewCode({ item: ITEM_CODE, code: 'x = 1', complete: llm.complete })
   assert.equal(result.cases.length, 5)
   assert.ok(llm.calls[0].messages[0].content.includes('unknown'))
+})
+
+test('TC-EDG-019 one corrective retry rescues an unparseable review', async () => {
+  const llm = fakeLlm({ replies: ['先说说思路：双指针。', CODE_REVIEW_OK] })
+  const result = await reviewCode({
+    item: ITEM_CODE,
+    code: 'x = 1',
+    language: 'javascript',
+    complete: llm.complete,
+  })
+  assert.equal(result.verdict, 'presumed-correct')
+  assert.equal(llm.calls.length, 2)
+  assert.equal(llm.calls[1].messages.at(-1).role, 'user')
+})
+
+test('TC-EDG-020 an aborted review is a timeout, not a bad score', async () => {
+  const aborted = new Error('The operation was aborted')
+  aborted.name = 'AbortError'
+  const llm = fakeLlm({ replies: [aborted] })
+  await assert.rejects(
+    () => reviewCode({ item: ITEM_CODE, code: 'x = 1', language: 'javascript', complete: llm.complete }),
+    { code: 'E_LLM_TIMEOUT' },
+  )
 })
