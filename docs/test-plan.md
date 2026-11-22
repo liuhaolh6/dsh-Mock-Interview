@@ -150,8 +150,12 @@ S4b 里两条值得单独说：
 | TC-EDG-043 | U | AC-8 | 样本充足时 Markdown 含短板与对应 action | ✅ |
 | TC-EDG-044 | U | AC-8 | 未考察维度记 `null` 且不进短板 | ✅ |
 | TC-EDG-045 | U | AC-8 | 连续导出走后缀，上限 99 次 | ✅ |
+| TC-EDG-046 | U | AC-8 | 旧版/残缺会话（无 mode、无 score）仍产出可读报告 | ✅ |
+| TC-WIR-006 | W | AC-1 | DSH_HOME 取自宿主服务 dshHomePath（Web 端不继承环境变量） | ✅ |
+| TC-WIR-007 | W | AC-1 | 服务与环境都缺 → session/list 报 E_BAD_REQUEST，不崩 | ✅ |
+| TC-WIR-008 | W | AC-1 | dshHome 回退链：空串 / 服务抛异常 / 无 scope → 环境变量 | ✅ |
 
-**S5 转绿记录（2026-11-23）**：6 条一起转绿 + S5b 五条边界补齐，共 2 个提交。
+**S5 转绿记录（2026-11-23）**：6 条一起转绿 + S5b 六条边界补齐（含 1 条真实缺陷修复），共 3 个提交。
 `lib/report.mjs` 新建：\`buildReport\`（六维均分、逐题记录、Top3 短板按均分升序）、\`renderMarkdown\`、
 \`resolveExportDir\`（只允许工作目录及其子目录）、\`exportReport\`（同名追加 \`-2\`、\`-3\`…）。
 \`session/finish\` 与 \`report/export\` 接进 dispatch，\`ACTIONS\` 6→**8**。
@@ -163,7 +167,7 @@ S4b 里两条值得单独说：
 
 分支覆盖率：\`report.mjs\` 只有 **73.91%**，但行覆盖 **100%**。缺口全在 \`x ?? y\` 的默认值分支上——
 要么不可达（字段恒存在），要么区分不出行为，硬凑用例只会制造假保护。**如实记录，不作达标主张**；
-门槛（行 99.79% / 分支 85.06%）按全量口径仍然过关。
+门槛（行 99.80% / 分支 87.45%）按全量口径仍然过关。
 
 ### S6 语音降级（AC-5）
 
@@ -240,3 +244,12 @@ S3b 覆盖的真实边界，不是为数字而写的：评审输出不可解析 
 `unverifiable`；`cases` 少于/等于/多于 5 条三条路径；非字符串代码按空处理；畸形 case 条目
 （数字 input / null expected / `ok:'yes'`）归一；JSON 提取器对字符串内花括号、未闭合对象、
 数组、诱饵对象（prose 里先出现 `{"verdict":"..."}`）的行为。
+
+### S5 期间发现并修复的真实缺陷
+
+活体验证时 `{"op":"session/list"}` 在宿主上返回 `E_BAD_REQUEST 缺少 DSH_HOME`：
+RPC 跑在 Web 服务进程里，**不继承启动它的 shell 的环境变量**。原先只读 `process.env.DSH_HOME` 的写法
+在线下测试永远成立、在真实宿主永远失败——这类缺陷只有活体调用能暴露。
+
+修法：`apply(ctx)` 里用 `dshHome(scope)` 先取宿主服务 `dshHomePath`（与 `dsh-collections` 一致），
+环境变量只作回退；TC-WIR-006..008 把这个顺序钉死。**结论：每个切片收口都必须包含一次活体 RPC 调用，不能只信单元测试。**

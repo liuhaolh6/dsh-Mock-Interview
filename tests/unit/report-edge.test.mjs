@@ -115,3 +115,29 @@ test('TC-EDG-045 repeated exports walk up the suffix and stop before infinity', 
   assert.equal(written.length, 1)
   assert.equal(result.bytes, Buffer.byteLength(renderMarkdown(report), 'utf8'))
 })
+
+test('TC-EDG-046 a legacy or damaged session still yields a readable report', () => {
+  // Old session files (pre-S4) have no report/mode and turns without scores.
+  const legacy = {
+    id: 'legacy1',
+    turns: [
+      { questionId: 'q-old' },
+      { questionId: 'q-old-2', score: {} },
+      { questionId: 'q-old-3', score: { overall: 'four', dims: { depth: 4 } } },
+    ],
+  }
+  const built = buildReport(legacy)
+  assert.equal(built.mode, '')
+  assert.equal(built.difficulty, '')
+  assert.equal(built.minutes, 0)
+  assert.equal(built.planned, 0)
+  assert.equal(built.answered, 3)
+  assert.equal(built.items[0].kind, 'unknown')
+  assert.equal(built.items[0].overall, null)
+  assert.equal(built.items[1].verdict, 'unverifiable')
+  assert.equal(built.overall, null, 'a non-numeric overall must not poison the average')
+  assert.equal(built.radar.dims.depth, 4)
+  assert.equal(built.radar.dims.correctness, null)
+  const markdown = renderMarkdown(built)
+  assert.match(markdown, /未评分/)
+})

@@ -6,7 +6,7 @@ DeepSeek Harness 插件：**模拟技术面试官**。把简历和目标岗位�
 > 已实现：`lib/profile.mjs`（简历+JD → 画像）、`lib/session.mjs`（按时长定额、按本人技能/项目定靶、题库补足不重复）、
 > `lib/director.mjs`（按难度定措辞、结论式回答追问一次）、`lib/scorer.mjs`（六维评分 + 越界钳制 + 无证据重试 + 空答 0 分）、
 > `lib/store.mjs`（原子写、2 MB 写前拦截）、`lib/report.mjs`（六维雷达 + Top3 短板 + Markdown 导出），
-> 共 99 条测试全绿。用例与覆盖矩阵见 [`docs/test-plan.md`](docs/test-plan.md)。已暴露的 RPC 动作 8 个（`ping`、`session/create`、`session/get`、`session/list`、`session/finish`、`session/delete`、`turn/answer`、`report/export`），
+> 共 103 条测试全绿。用例与覆盖矩阵见 [`docs/test-plan.md`](docs/test-plan.md)。已暴露的 RPC 动作 8 个（`ping`、`session/create`、`session/get`、`session/list`、`session/finish`、`session/delete`、`turn/answer`、`report/export`），
 > 剩余切片 S6、S7 实现后才进 `ACTIONS`（契约 lint 强制双向一致；当前 8 个已实现动作全部登记）。
 
 ## 为什么要有它
@@ -57,9 +57,9 @@ Node `v24.20.0` / npm `11.19.0` 下实跑：
 | `npm install` | 0 依赖，无报错 | 同上 | 同上 | 同上 |
 | `npm run build` | 3 个入口文件语法通过 | 3 个入口文件语法通过 | `node --check` 通过 | `node --check` 通过 |
 | `npm run lint` | `0 error(s), 0 warning(s), 7 file(s) scanned` | `0 error(s), 0 warning(s), 7 file(s) scanned`（新增 tables 检查） | `0 error(s), 0 warning(s), 13 file(s) scanned` | `0 error(s), 0 warning(s), 22 file(s) scanned` | `0 error(s), 0 warning(s), 29 file(s) scanned` |
-| `npm test` | 14 passed / 0 failed / 0 skipped | 19 passed / 0 failed / 0 skipped | 31 tests：19 passed / 12 failed（预期红） | 63 passed（S3） | **99 passed / 0 failed / 0 skipped**（S5） |
+| `npm test` | 14 passed / 0 failed / 0 skipped | 19 passed / 0 failed / 0 skipped | 31 tests：19 passed / 12 failed（预期红） | 63 passed（S3） | 99 passed（S5） | **103 passed / 0 failed / 0 skipped**（S5 收口） |
 | `npm run e2e` | 6 passed | 6 passed | 6 passed（未变动） | 6 passed |
-| `npm run coverage` | 行 98.77% / 分支 87.80% | 行 99.02% / 分支 87.80% | 行 99.18% / 分支 88.89%（桩函数被调用即计覆盖，不可作依据） | 行 99.66% / 分支 85.02% | **行 99.79% / 分支 85.06%**（S5：`report.mjs` 行覆盖 100%，分支 73.91% 全在 `??` 默认值上） |
+| `npm run coverage` | 行 98.77% / 分支 87.80% | 行 99.02% / 分支 87.80% | 行 99.18% / 分支 88.89%（桩函数被调用即计覆盖，不可作依据） | 行 99.66% / 分支 85.02% | **行 99.80% / 分支 87.45%**（S5：`report.mjs` 行 100% / 分支 86.41%） |
 
 那 12 条红色用例（`TC-PRO-001..006` + `TC-SES-001..006`）已在 G4 的 12 个「一轮一用例」提交里全部转绿，
 失败原因从 `Error: not implemented yet: … (G4)` 变为真实边界处理；未改动任何断言。

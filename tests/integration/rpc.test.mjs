@@ -3,7 +3,7 @@ import test from 'node:test'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { apply, dispatch, RPC_PATH, VERSION } from '../../index.js'
+import { apply, dispatch, dshHome, RPC_PATH, VERSION } from '../../index.js'
 
 const URL_BASE = 'http://localhost' + RPC_PATH
 
@@ -183,5 +183,26 @@ test('TC-WIR-007 without a host service or env there is no home, and the request
     assert.equal(JSON.parse(captured.body).error.code, 'E_BAD_REQUEST')
   } finally {
     if (saved !== undefined) process.env.DSH_HOME = saved
+  }
+})
+
+test('TC-WIR-008 dshHome falls back to the environment and survives a throwing service', () => {
+  const saved = process.env.DSH_HOME
+  process.env.DSH_HOME = 'D:/fallback-home'
+  try {
+    assert.equal(dshHome({ get: () => undefined }), 'D:/fallback-home')
+    assert.equal(dshHome({ get: () => '' }), 'D:/fallback-home')
+    assert.equal(
+      dshHome({
+        get: () => {
+          throw new Error('service exploded')
+        },
+      }),
+      'D:/fallback-home',
+    )
+    assert.equal(dshHome(undefined), 'D:/fallback-home')
+  } finally {
+    if (saved === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = saved
   }
 })
