@@ -84,6 +84,7 @@ window.__ModuleLoader__.load({
         'report.export': '导出 Markdown',
         'report.exported': '已导出：',
         'report.again': '再面一场',
+        'report.dir': '导出目录（留空=宿主默认工作目录）',
         'report.sample': '样本不足：少于 3 题，结论仅供参考',
         'error.prefix': '出错了',
         'busy.hint': '正在等模型，通常 3–10 秒',
@@ -210,6 +211,25 @@ window.__ModuleLoader__.load({
       list: { margin: 0, paddingLeft: '18px', fontSize: '13px', lineHeight: 1.9, opacity: 0.88 },
     }
 
+    // The profile contract stores projects as {name, role, highlights}; the text
+    // box shows them on one line and parses them back without inventing fields.
+    function formatProject(entry) {
+      const rest = [entry?.role, ...(entry?.highlights ?? [])].filter((part) => part).join('｜')
+      return rest === '' ? String(entry?.name ?? '') : `${entry.name}：${rest}`
+    }
+
+    function parseProject(line) {
+      const cut = line.search(/[:：]/)
+      if (cut < 0) return { name: line, role: '', highlights: [] }
+      const name = line.slice(0, cut).trim()
+      const parts = line
+        .slice(cut + 1)
+        .split(/[｜|]/)
+        .map((part) => part.trim())
+        .filter((part) => part !== '')
+      return { name, role: parts[0] ?? '', highlights: parts.slice(1) }
+    }
+
     function Field(props) {
       return h(
         'div',
@@ -316,6 +336,13 @@ window.__ModuleLoader__.load({
               ),
             )
           : null,
+        h(Field, { label: t('report.dir') },
+          h('input', {
+            style: styles.input,
+            value: props.exportDir,
+            placeholder: 'D:/project/04-docs/interview-reports',
+            onChange: (event) => props.onDirChange(event.target.value),
+          })),
         h('div', { style: { ...styles.row, marginTop: '16px' } },
           h('button', { type: 'button', style: styles.primary, onClick: props.onExport, disabled: props.busy }, t('report.export')),
           h('button', { type: 'button', style: styles.button, onClick: props.onRestart }, t('report.again')),
@@ -343,6 +370,7 @@ window.__ModuleLoader__.load({
       const [probe, setProbe] = useState('')
       const [report, setReport] = useState(null)
       const [exportPath, setExportPath] = useState('')
+      const [exportDir, setExportDir] = useState('')
 
       const items = session?.plan?.items ?? []
       const item = items[index]
@@ -382,11 +410,7 @@ window.__ModuleLoader__.load({
           setProfile(next)
           setWarnings(result.value.warnings ?? [])
           setSkillsText((next.skills ?? []).join('，'))
-          setProjectsText(
-            (next.projects ?? [])
-              .map((entry) => (entry.summary ? `${entry.name}：${entry.summary}` : entry.name))
-              .join('\n'),
-          )
+          setProjectsText((next.projects ?? []).map(formatProject).join('\n'))
           setPhase('confirm')
         })
       }, [setup, onError, t])
@@ -400,11 +424,7 @@ window.__ModuleLoader__.load({
           .split(/\n/)
           .map((line) => line.trim())
           .filter((line) => line !== '')
-          .map((line) => {
-            const cut = line.search(/[:：]/)
-            if (cut < 0) return { name: line, summary: '' }
-            return { name: line.slice(0, cut).trim(), summary: line.slice(cut + 1).trim() }
-          })
+          .map(parseProject)
         const merged = {
           ...(profile ?? {}),
           skills,
@@ -463,12 +483,14 @@ window.__ModuleLoader__.load({
         if (session === null) return
         setBusy(true)
         setError('')
-        rpc('report/export', { sessionId: session.sessionId }).then((result) => {
+        const body = { sessionId: session.sessionId }
+        if (exportDir.trim() !== '') body.dir = exportDir.trim()
+        rpc('report/export', body).then((result) => {
           setBusy(false)
           if (!result.ok) return onError(result)
           setExportPath(result.value.path ?? '')
         })
-      }, [session, onError])
+      }, [session, exportDir, onError])
 
       const speak = useCallback(() => {
         const text = item?.topic ?? ''
@@ -575,7 +597,16 @@ window.__ModuleLoader__.load({
         return h(
           'div',
           { style: styles.page },
-          h(ReportPanel, { t, report, busy, exportPath, onExport: exportReport, onRestart: reset }),
+          h(ReportPanel, {
+            t,
+            report,
+            busy,
+            exportPath,
+            exportDir,
+            onDirChange: setExportDir,
+            onExport: exportReport,
+            onRestart: reset,
+          }),
           error !== '' ? h('div', { style: styles.bad }, error) : null,
         )
       }
