@@ -51,17 +51,17 @@
 
 | ID | 层 | AC | 场景 | 状态 |
 |---|---|---|---|---|
-| TC-DIR-001 | U | AC-2 | 难度 junior/mid/senior 的题面措辞分别取自各自题库标签 | ⬜ |
-| TC-DIR-002 | U | AC-2 | 12 道题的 target 不重复（同一会话内不重复问同一 skill） | ⬜ |
-| TC-DIR-003 | U | AC-3 | 答案「就是缓存」→ 判定过浅，`probe.asked===true`，且 `probe.reason` 非空 | ⬜ |
-| TC-DIR-004 | U | AC-3 | 同一题第二次仍过浅 → 不再追问（最多一次），进入下一题 | ⬜ |
-| TC-DIR-005 | U | AC-3 | 答案为空 → 记 0 分 + 追问一次，不报错 | ⬜ |
-| TC-SCR-001 | U | AC-4 | 合法评分 JSON → 六维齐全、`overall` 为分均、`evidence` 至少 1 条 | ⬜ |
-| TC-SCR-002 | U | AC-4 | 分数 7 / 0 / -1（越界）→ 钳到 1–5 并记 `warnings` | ⬜ |
-| TC-SCR-003 | U | AC-4 | `evidence` 为空 → 视为无效评分，重试一次 | ⬜ |
-| TC-SCR-004 | U | AC-4 | 两次都返回非 JSON → 抛 `E_SCORE_INVALID`，且**未**写入会话 | ⬜ |
-| TC-SCR-005 | U | AC-4 | 维度缺失一项 → 补 `null` 并标 `warnings`，不整体失败 | ⬜ |
-| TC-SCR-006 | I | AC-4 | `turn/answer` 端到端：作答后 `session.turns[0].score.dims` 六键齐全 | ⬜ |
+| TC-DIR-001 | U | AC-2 | 难度 junior/mid/senior 的题面措辞分别取自各自题库标签 | 🔴 |
+| TC-DIR-002 | U | AC-2 | 45 分钟 13 题的 target 全部不重复（同一会话内不重复问同一技能） | 🔴 |
+| TC-DIR-003 | U | AC-3 | 答案「就是缓存」→ 判定过浅，`probe.asked===true`，且 `probe.reason` 非空 | 🔴 |
+| TC-DIR-004 | U | AC-3 | 同一题第二次仍过浅 → 不再追问（最多一次），进入下一题 | 🔴 |
+| TC-DIR-005 | U | AC-3 | 答案为空 → 记 0 分 + 追问一次，不报错 | 🔴 |
+| TC-SCR-001 | U | AC-4 | 合法评分 JSON → 六维齐全、`overall` 为分均、`evidence` 至少 1 条 | 🔴 |
+| TC-SCR-002 | U | AC-4 | 分数 7 / 0 / -1（越界）→ 钳到 1–5 并记 `warnings` | 🔴 |
+| TC-SCR-003 | U | AC-4 | `evidence` 为空 → 视为无效评分，重试一次 | 🔴 |
+| TC-SCR-004 | U | AC-4 | 两次都返回非 JSON → 抛 `E_SCORE_INVALID`，且**未**写入会话 | 🔴 |
+| TC-SCR-005 | U | AC-4 | 维度缺失一项 → 补 `null` 并标 `warnings`，不整体失败 | 🔴 |
+| TC-SCR-006 | I | AC-4 | `turn/answer` 端到端：作答后 `session.turns[0].score.dims` 六键齐全 | ⏭ 移至 S4（依赖会话存储与 dispatch 接线，与 TC-SES-007 同批） |
 
 ### S3 手撕评审（AC-6）
 
