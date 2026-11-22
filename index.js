@@ -131,6 +131,9 @@ export async function dispatch(request, deps = {}) {
         if (item === undefined) {
           return fail('E_BAD_REQUEST', `plan 里没有题目 ${String(body.questionId)}`)
         }
+        if (typeof deps.complete !== 'function') {
+          return fail('E_LLM_UNAVAILABLE', '宿主没有可用的模型服务（llm），无法评分')
+        }
         const { score, warnings } = await scoreAnswer({
           item,
           answer: body.answer,
