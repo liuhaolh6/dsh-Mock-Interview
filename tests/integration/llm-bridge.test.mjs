@@ -190,3 +190,47 @@ test('TC-WIR-012 without a default route the turn fails as E_LLM_UNAVAILABLE', a
     await rm(home, { recursive: true, force: true })
   }
 })
+test('TC-WIR-013 string contents become text blocks and assistant turns become user context', async () => {
+  const home = await tempHome()
+  const saved = process.env.DSH_HOME
+  process.env.DSH_HOME = home
+  try {
+    const seen = []
+    const ask = harness({
+      selection: { provider: 'deepseek', model: 'deepseek-chat' },
+      llm: {
+        stream: async function* (options) {
+          seen.push(structuredClone(options.messages))
+          // First reply is unparseable so the engine retries with the
+          // assistant-role correction message in the second call.
+          yield { type: 'text-delta', index: 0, text: '抱歉，我先说结论。' }
+          yield { type: 'finish', reason: { kind: 'stop' } }
+        },
+      },
+    })
+    const created = await ask(START)
+    const answered = await ask({
+      op: 'turn/answer',
+      sessionId: created.value.sessionId,
+      questionId: created.value.plan.items[0].id,
+      answer: '索引用的是 B+ 树。',
+    })
+    assert.equal(answered.ok, false)
+    assert.equal(answered.error.code, 'E_SCORE_INVALID')
+    assert.ok(seen.length >= 2)
+    for (const messages of seen) {
+      for (const message of messages) {
+        assert.equal(Array.isArray(message.content), true, JSON.stringify(message))
+        for (const block of message.content) {
+          assert.equal(block.type, 'text')
+          assert.equal(typeof block.text, 'string')
+        }
+        assert.notEqual(message.role, 'assistant', 'the adapter requires provider metadata for assistant turns')
+      }
+    }
+  } finally {
+    if (saved === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = saved
+    await rm(home, { recursive: true, force: true })
+  }
+})

@@ -276,6 +276,38 @@ async function handle(req, res, deps) {
  *
  * @param {object} scope Cordis scope
  */
+function textBlocks(content) {
+  if (typeof content === 'string') return [{ type: 'text', text: content }]
+  if (Array.isArray(content)) {
+    return content.filter((block) => block !== null && typeof block === 'object' && block.type === 'text')
+  }
+  return []
+}
+
+/**
+ * Turn plain `{ role, content: string }` pairs into the `RequestMessage[]` the
+ * adapter accepts: every `content` is a text-block array, and an assistant turn
+ * cannot be replayed because the host requires model provenance on it — the
+ * previous reply therefore travels as user context instead.
+ *
+ * @param {unknown} messages engine-supplied messages
+ * @returns {Array<{ role: 'user', content: Array<{ type: 'text', text: string }> }>}
+ */
+function toRequestMessages(messages) {
+  const out = []
+  for (const message of Array.isArray(messages) ? messages : []) {
+    if (message === null || typeof message !== 'object') continue
+    const blocks = textBlocks(message.content)
+    if (message.role === 'assistant') {
+      const previous = blocks.map((block) => block.text).join('\n')
+      out.push({ role: 'user', content: [{ type: 'text', text: '（你上一条回复）\n' + previous }] })
+      continue
+    }
+    out.push({ role: 'user', content: blocks })
+  }
+  return out
+}
+
 /**
  * Which provider and model to call. `GenerateOptions` requires both, and the
  * adapter is selected by `provider`, so a call without a route never reaches a
@@ -332,7 +364,7 @@ function llmBridge(scope) {
     }
     const parts = []
     let failure
-    const stream = llm.stream({ ...route, system, messages, signal, purpose: 'dsh-mock-interview' })
+    const stream = llm.stream({ ...route, system, messages: toRequestMessages(messages), signal, purpose: 'dsh-mock-interview' })
     for await (const chunk of stream) {
       if (chunk?.type === 'finish') {
         const kind = chunk.reason?.kind

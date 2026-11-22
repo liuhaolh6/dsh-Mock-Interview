@@ -192,7 +192,8 @@ S4b 里两条值得单独说：
 | TC-WIR-009 | I | AC-3/AC-4 | adapter 以 `finish.reason.kind='error'` 失败 → `turn/answer` 返回 `E_LLM_UNAVAILABLE`，消息里带 `failure.message` | ✅ |
 | TC-WIR-010 | I | AC-3 | adapter 以 `finish.reason.kind='aborted'` 结束 → `E_LLM_TIMEOUT` | ✅ |
 | TC-WIR-011 | I | AC-4 | 默认选择被用作路由：`stream` 收到的 `provider`/`model` 等于 `agentDefaultModel.currentSelection()`，`text-delta` 正确拼接并出分 | ✅ |
-| TC-WIR-012 | I | AC-4 | 既无默认选择也无 provider 列表 → `E_LLM_UNAVAILABLE`（文案含「默认模型」），不发请求 | ✅ |
+| TC-WIR-012 | I | AC-4 | 既无默认选择也无 provider 列表 → （文案含「默认模型」），不发请求 | ✅ |
+| TC-WIR-013 | I | AC-4 | 消息被规整为文本块数组；assistant 历史转成 user 上下文重放，adapter 不再报  | ✅ |
 
 **S6b 转绿记录（2026-11-23）**：4 条一起转绿（`tests/integration/llm-bridge.test.mjs`）。
 起因是活体回归里 `turn/answer` 恒返回 `E_SCORE_INVALID`：`llmBridge` 没带 `provider`/`model`，adapter 选不出来，
