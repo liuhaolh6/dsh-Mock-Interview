@@ -13,7 +13,9 @@ test('TC-CON-002 actions are unique, non-empty and sorted', () => {
   assert.ok(ACTIONS.length > 0)
   for (const action of ACTIONS) {
     assert.equal(typeof action, 'string')
-    assert.match(action, /^[a-z][a-z0-9-]*$/)
+    // Namespaced ops (`session/create`) are part of the frozen contract §3, so
+    // the shape allows one or more `/`-separated lowercase segments.
+    assert.match(action, /^[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)*$/)
   }
   assert.equal(new Set(ACTIONS).size, ACTIONS.length)
   assert.deepEqual(ACTIONS, [...ACTIONS].sort())

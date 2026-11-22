@@ -1,11 +1,10 @@
 /**
  * dsh-mock-interview — Host half.
  *
- * G1 scope: the transport plumbing only. One JSON-over-POST endpoint at
- * /api/dsh-mock-interview/rpc, one `ping` action, one error envelope. The
- * interview engine (profile extraction, question director, rubric scoring,
- * report rendering) is added in G4 one test case at a time — see
- * docs/test-plan.md.
+ * One JSON-over-POST endpoint at /api/dsh-mock-interview/rpc and a dispatch
+ * table of actions. The interview engine (profile extraction, question
+ * director, rubric scoring, code review, session store, report rendering) lives
+ * in `lib/` and is added one test case at a time — see docs/test-plan.md.
  *
  * Failure policy: registering the route never fails the composition. Without a
  * web server the plugin has no browser surface and stays inert; the browser
@@ -15,6 +14,10 @@
  */
 
 import { ACTIONS, ERROR_CODES, RPC_PATH, SCHEMA_VERSION } from './lib/contracts.js'
+import { isContractError } from './lib/errors.mjs'
+import { buildPlan } from './lib/session.mjs'
+import { scoreAnswer } from './lib/scorer.mjs'
+import { createStore } from './lib/store.mjs'
 
 export const name = 'dsh-mock-interview'
 export const inject = []
@@ -39,11 +42,23 @@ function fail(code, message) {
   )
 }
 
+/** The store for this call: injected in tests, derived from DSH_HOME live. */
+function resolveStore(deps) {
+  if (deps.store !== undefined) return deps.store
+  const home = deps.home ?? process.env.DSH_HOME
+  return createStore({ home })
+}
+
 /**
  * Pure request/response core, independent of the Node http objects.
  *
  * @param {Request} request
- * @param {{ now?: () => number }} [deps]
+ * @param {{
+ *   now?: () => number,
+ *   home?: string,
+ *   store?: object,
+ *   complete?: (request: { system: string, messages: object[], signal?: AbortSignal }) => Promise<string>,
+ * }} [deps]
  * @returns {Promise<Response>}
  */
 export async function dispatch(request, deps = {}) {
@@ -62,12 +77,86 @@ export async function dispatch(request, deps = {}) {
   const op = typeof body.op === 'string' ? body.op : ''
   if (!ACTIONS.includes(op)) return fail('E_UNKNOWN_ACTION', `unknown op "${op}"`)
 
-  switch (op) {
-    case 'ping':
-      return ok({ pong: true, version: VERSION, schemaVersion: SCHEMA_VERSION, at: now() })
-    default:
-      // Unreachable while ACTIONS and this switch agree; contract-lint proves it.
-      return fail('E_UNKNOWN_ACTION', `unhandled op "${op}"`)
+  try {
+    switch (op) {
+      case 'ping':
+        return ok({ pong: true, version: VERSION, schemaVersion: SCHEMA_VERSION, at: now() })
+
+      case 'session/create': {
+        const plan = await buildPlan({
+          profile: body.profile,
+          mode: body.mode,
+          difficulty: body.difficulty,
+          minutes: body.minutes,
+        })
+        const at = now()
+        const session = {
+          schemaVersion: SCHEMA_VERSION,
+          id: globalThis.crypto.randomUUID(),
+          createdAt: at,
+          updatedAt: at,
+          status: 'active',
+          mode: body.mode,
+          difficulty: body.difficulty,
+          minutes: body.minutes,
+          profile: body.profile,
+          plan,
+          turns: [],
+        }
+        await resolveStore(deps).put(session)
+        return ok({ sessionId: session.id, plan })
+      }
+
+      case 'session/get': {
+        const session = await resolveStore(deps).get(body.sessionId)
+        return ok({ session })
+      }
+
+      case 'session/list': {
+        const sessions = await resolveStore(deps).list()
+        return ok({ sessions })
+      }
+
+      case 'session/delete': {
+        return ok(await resolveStore(deps).remove(body.sessionId))
+      }
+
+      case 'turn/answer': {
+        const store = resolveStore(deps)
+        const session = await store.get(body.sessionId)
+        if (session.status === 'finished') {
+          return fail('E_SESSION_FINISHED', '这场面试已经结束了，不能再作答')
+        }
+        const item = (session.plan?.items ?? []).find((entry) => entry?.id === body.questionId)
+        if (item === undefined) {
+          return fail('E_BAD_REQUEST', `plan 里没有题目 ${String(body.questionId)}`)
+        }
+        const { score, warnings } = await scoreAnswer({
+          item,
+          answer: body.answer,
+          difficulty: session.difficulty,
+          complete: deps.complete,
+        })
+        const turn = {
+          questionId: item.id,
+          answer: String(body.answer ?? ''),
+          score,
+          warnings,
+          at: now(),
+        }
+        session.turns = [...(session.turns ?? []), turn]
+        session.updatedAt = now()
+        await store.put(session)
+        return ok({ turn })
+      }
+
+      default:
+        // Unreachable while ACTIONS and this switch agree; contract-lint proves it.
+        return fail('E_UNKNOWN_ACTION', `unhandled op "${op}"`)
+    }
+  } catch (problem) {
+    if (isContractError(problem)) return fail(problem.code, problem.message)
+    throw problem
   }
 }
 
@@ -81,7 +170,7 @@ async function readBody(req) {
 }
 
 /** Node http adapter: turn (req, res) into one dispatch call. */
-async function handle(req, res) {
+async function handle(req, res, deps) {
   const write = (status, text) => {
     res.writeHead(status, JSON_HEADERS)
     res.end(text)
@@ -93,11 +182,32 @@ async function handle(req, res) {
       headers: { 'content-type': 'application/json' },
       body: raw === null ? '{}' : raw.toString('utf8'),
     })
-    const response = await dispatch(request)
+    const response = await dispatch(request, deps)
     write(response.status, await response.text())
   } catch (problem) {
     const message = problem instanceof Error ? problem.message : String(problem)
     write(500, JSON.stringify({ ok: false, error: { code: 'E_INTERNAL', message } }))
+  }
+}
+
+/**
+ * Adapt the host LLM service to the `complete` shape the engine expects.
+ * Returns undefined when the service is absent, so callers fail with
+ * E_LLM_UNAVAILABLE instead of crashing.
+ *
+ * @param {object} scope Cordis scope
+ */
+function llmBridge(scope) {
+  const llm = typeof scope?.get === 'function' ? scope.get('llm') : undefined
+  if (llm === undefined || typeof llm.stream !== 'function') return undefined
+  return async ({ system, messages, signal }) => {
+    const parts = []
+    const stream = llm.stream({ system, messages, signal, purpose: 'dsh-mock-interview' })
+    for await (const chunk of stream) {
+      const text = chunk?.text ?? chunk?.delta ?? chunk?.content
+      if (typeof text === 'string') parts.push(text)
+    }
+    return parts.join('')
   }
 }
 
@@ -110,10 +220,11 @@ export function apply(ctx) {
   ctx.inject(['webServer'], (scope) => {
     const server = scope.get('webServer')
     if (server === undefined || typeof server.register !== 'function') return
+    const deps = { complete: llmBridge(scope) }
     scope.effect(
       // The promise is returned so a test (and the server) can await the reply;
       // `handle` swallows its own errors, so it never rejects.
-      () => server.register({ kind: 'exact', path: RPC_PATH, handler: (req, res) => handle(req, res) }),
+      () => server.register({ kind: 'exact', path: RPC_PATH, handler: (req, res) => handle(req, res, deps) }),
       'dsh-mock-interview: interview api',
     )
   })
