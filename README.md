@@ -12,16 +12,24 @@ DeepSeek Harness 插件：**模拟技术面试官**。把简历和目标岗位�
 
 插件以 `link:` 方式挂进 profile，和 `dsh-collections` 同样的装法：
 
-```bash
-# 1. 链接到 profile 的依赖里
-#    ~/.dsh/profiles/<profile>/package.json
-#    "dependencies": { "dsh-mock-interview": "link:D:/project/02-plugins/dsh-mock-interview" }
-#    "dsh": { "profile": { "bundles": [ ..., "dsh-mock-interview" ] } }
+1. 编辑 `C:\Users\<你>\.dsh\profiles\<profile>\package.json`：
 
-# 2. 安装并重启 DSH Web 端
+```jsonc
+"dependencies": {
+  "dsh-mock-interview": "link:D:/project/02-plugins/dsh-mock-interview"
+},
+"dsh": { "profile": { "bundles": [ /* ... */, "dsh-mock-interview" ] } }
 ```
 
-装好后侧边栏出现「模拟面试」图标，点开即是面试页；页面上的**连通性自检**能一键确认 host 半是否在线。
+2. 用 DSH 自带的 pnpm 装一次（PATH 上没有 pnpm 时）：
+
+```bash
+cd "C:/Users/<你>/.dsh/profiles/<profile>"
+node "D:/agent/DeepseekHarness/resources/runtime/primary-runtime/dependencies/pnpm/bin/pnpm.cjs" install --prefer-offline
+# → + dsh-mock-interview 0.1.0 <- D:\project\02-plugins\dsh-mock-interview
+```
+
+3. **重启 DSH Web 端**（bundle 只在启动时装配）。装好后侧边栏出现「模拟面试」图标，点开即是面试页；页面上的**连通性自检**能一键确认 host 半是否在线。
 
 ## 命令
 
