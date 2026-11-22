@@ -37,7 +37,7 @@
 | TC-PRO-002 | U | AC-1 | 简历与 JD 都是空白字符串 | `extractProfile` | 抛 `E_BAD_REQUEST`，且**未**调用 LLM | 🟢 |
 | TC-PRO-003 | U | AC-1 | fakeLlm 两次都返回非 JSON 文本 | `extractProfile` | 抛 `E_PROFILE_INVALID`，调用次数恰好 2 | 🟢 |
 | TC-PRO-004 | U | AC-1 | fakeLlm 抛 `Error('timeout')` | `extractProfile` | 抛 `E_LLM_TIMEOUT` | 🟢 |
-| TC-PRO-005 | U | AC-1 | 简历 20 001 字符 | `extractProfile` | 抛 `E_BAD_REQUEST`，未调用 LLM | 🔴 |
+| TC-PRO-005 | U | AC-1 | 简历 20 001 字符 | `extractProfile` | 抛 `E_BAD_REQUEST`，未调用 LLM | 🟢 |
 | TC-PRO-006 | U | AC-1 | JD 只有 `{title:'Java 后端'}`，无 company/level | `extractProfile` | 返回画像且 `warnings` 含「缺少公司/级别」；`jd.title` 保留 | 🔴 |
 | TC-SES-001 | U | AC-2 | 画像已确认，`tech-1`/`mid`/30 分钟 | `buildPlan` | `plan.budget===9`，`plan.items.length` 落在 7–11（`budgetTolerance=2`） | 🔴 |
 | TC-SES-002 | U | AC-2 | `minutes: 20` | `buildPlan` | 抛 `E_BAD_REQUEST` | 🔴 |
