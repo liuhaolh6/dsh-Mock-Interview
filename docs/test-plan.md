@@ -55,7 +55,7 @@
 | TC-DIR-002 | U | AC-2 | 45 分钟 13 题的 target 全部不重复（同一会话内不重复问同一技能） | 🟢 |
 | TC-DIR-003 | U | AC-3 | 答案「就是缓存」→ 判定过浅，`probe.asked===true`，且 `probe.reason` 非空 | 🟢 |
 | TC-DIR-004 | U | AC-3 | 同一题第二次仍过浅 → 不再追问（最多一次），进入下一题 | 🟢（与 003 共用一个 `alreadyProbed` 守卫） |
-| TC-DIR-005 | U | AC-3 | 答案为空 → 记 0 分 + 追问一次，不报错 | 🔴 |
+| TC-DIR-005 | U | AC-3 | 答案为空 → 记 0 分 + 追问一次，不报错 | 🟢 |
 | TC-SCR-001 | U | AC-4 | 合法评分 JSON → 六维齐全、`overall` 为分均、`evidence` 至少 1 条 | 🔴 |
 | TC-SCR-002 | U | AC-4 | 分数 7 / 0 / -1（越界）→ 钳到 1–5 并记 `warnings` | 🔴 |
 | TC-SCR-003 | U | AC-4 | `evidence` 为空 → 视为无效评分，重试一次 | 🔴 |
