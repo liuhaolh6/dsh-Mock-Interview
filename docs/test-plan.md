@@ -43,7 +43,7 @@
 | TC-SES-002 | U | AC-2 | `minutes: 20` | `buildPlan` | 抛 `E_BAD_REQUEST` | 🟢 |
 | TC-SES-003 | U | AC-2 | 画像无技能、无项目 | `buildPlan` | 抛 `E_PROFILE_INCOMPLETE` | 🟢 |
 | TC-SES-004 | U | AC-2 | 同上正例 | `buildPlan` | `items` 中至少 1 条 `kind===\x27code\x27` | 🟢 |
-| TC-SES-005 | U | AC-2 | 画像含 6 项技能、2 个项目 | `buildPlan` | 至少 3 条 item 的 `target` 指向画像里的技能或项目 | 🔴 |
+| TC-SES-005 | U | AC-2 | 画像含 6 项技能、2 个项目 | `buildPlan` | 至少 3 条 item 的 `target` 指向画像里的技能或项目 | 🟢 |
 | TC-SES-006 | U | AC-2 | `mode: 'hr'` | `buildPlan` | 抛 `E_BAD_REQUEST` | 🔴 |
 | TC-SES-007 | I | AC-1/2 | fakeContext + fakeLlm | `dispatch({op:'session/create'})` → 再 `session/get` | 返回同一 `sessionId`，`session.plan.budget===9` | ⬜ |
 
