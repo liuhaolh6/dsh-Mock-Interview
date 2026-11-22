@@ -123,6 +123,37 @@
   - 响应里的 `score` 与 `turn/answer` 用同一套 `buildCard()` 归一（钳制 1..5、缺维 null、
     `overall` 取六维算术平均），避免手撕题和八股题两套评分口径。
 
+### 2.1 `Report` 附加字段（S5 实现记录）
+
+§2 只钉死了 `sessionId` / `summary` / `radar.dims` / `weakTop3` / `actions` / `codeVerified`。
+实现另外带回以下字段（**只增不减，旧客户端可忽略**），UI 与导出直接消费它们：
+
+| 字段 | 类型 | 语义 |
+| --- | --- | --- |
+| `generatedAt` | number | 报告生成时刻（ms） |
+| `mode` / `difficulty` / `minutes` | string / string / number | 会话配置快照，报告脱离会话也能读懂 |
+| `planned` / `answered` | number | 计划题数 / 已答题数 |
+| `sampleAdequate` | boolean | `answered >= 3`；false 时报告标注「样本不足，仅供参考」 |
+| `overall` | number \| null | 六维算术平均，保留 1 位；无分则 `null` |
+| `dims` | Record<string, number\|null> | 与 `radar.dims` 同一份数据（雷达图与表格共用） |
+| `items` | array | 逐题 `{questionId, kind, target, topic, overall, verdict, missing}` |
+| `weaknesses` | array | `{dimension, average, action}`，与 `weakTop3`/`actions` 同序 |
+
+两条判定规则（实现层固化，不得在 UI 侧另算）：
+1. **未考察 ≠ 0 分**：维度值为 `null` 时不参与短板排序，也不计入 `overall`（否则「没考」会被当成「考砸」）。
+2. **短板上限 3**：按维度均分升序取前三；不足三个测过的维度就有几个列几个，`weakTop3` 与 `actions` 恒等长。
+
+### 2.2 `report/export` 的文件名规则（S5 实现记录）
+
+```
+<YYYY-MM-DD>-<sessionId 前 8 位>.md      // 首次导出
+<YYYY-MM-DD>-<sessionId 前 8 位>-2.md    // 同名已存在
+<YYYY-MM-DD>-<sessionId 前 8 位>-99.md   // 后缀探测上限，之后不再尝试
+```
+
+- 只允许写工作目录及其子目录：`dir` 越界（`../..`、绝对路径、`.` 本身）→ `E_BAD_REQUEST`，且**在落盘前**拦下。
+- 永不覆盖：撞名加后缀；`mkdir` 与 `writeFile` 的异常统一映射 `E_EXPORT_FAILED`（`EACCES` / `ENOSPC` 等只进 detail，不外泄路径）。
+
 ### 3.8 `session/finish`
 - 请求：`{ "op": "session/finish", "sessionId": "..." }`
 - 响应：`{ "report": Report }`

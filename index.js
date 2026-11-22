@@ -16,6 +16,7 @@
 import { ACTIONS, ERROR_CODES, LIMITS, RPC_PATH, SCHEMA_VERSION } from './lib/contracts.js'
 import { decideProbe } from './lib/director.mjs'
 import { isContractError } from './lib/errors.mjs'
+import { buildReport, exportReport } from './lib/report.mjs'
 import { buildPlan } from './lib/session.mjs'
 import { scoreAnswer } from './lib/scorer.mjs'
 import { createStore } from './lib/store.mjs'
@@ -124,6 +125,32 @@ export async function dispatch(request, deps = {}) {
 
       case 'session/delete': {
         return ok(await resolveStore(deps).remove(body.sessionId))
+      }
+
+      case 'session/finish': {
+        const store = resolveStore(deps)
+        const session = await store.get(body.sessionId)
+        // §3.8: finishing twice replays the report instead of re-scoring.
+        if (session.status === 'finished' && session.report !== undefined) {
+          return ok({ report: session.report })
+        }
+        const report = buildReport(session)
+        session.status = 'finished'
+        session.report = report
+        session.updatedAt = now()
+        await store.put(session)
+        return ok({ report })
+      }
+
+      case 'report/export': {
+        const session = await resolveStore(deps).get(body.sessionId)
+        const report = session.report ?? buildReport(session)
+        const exported = await exportReport({
+          report,
+          dir: body.dir,
+          cwd: typeof deps.cwd === 'string' && deps.cwd !== '' ? deps.cwd : process.cwd(),
+        })
+        return ok(exported)
       }
 
       case 'turn/answer': {

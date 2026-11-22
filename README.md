@@ -2,11 +2,12 @@
 
 DeepSeek Harness 插件：**模拟技术面试官**。把简历和目标岗位喂进去，它会按真实面试的节奏连问你——八股、简历项目深挖、手撕代码、行为面——支持文字和语音作答，每题给分并指出「哪句答错、缺什么、怎么补」，最后导出一份可复盘的 Markdown 报告。
 
-> 当前状态：**G4 进行中（切片 S1、S2、S3、S4 已全绿）**。G1 骨架与挂载、G2 契约、G3 红基线均已收口。
+> 当前状态：**G4 进行中（切片 S1–S5 已全绿）**。G1 骨架与挂载、G2 契约、G3 红基线均已收口；剩 S6 语音降级、S7 页面接线。
 > 已实现：`lib/profile.mjs`（简历+JD → 画像）、`lib/session.mjs`（按时长定额、按本人技能/项目定靶、题库补足不重复）、
-> `lib/director.mjs`（按难度定措辞、结论式回答追问一次）、`lib/scorer.mjs`（六维评分 + 越界钳制 + 无证据重试 + 空答 0 分），
-> 共 87 条测试全绿。用例与覆盖矩阵见 [`docs/test-plan.md`](docs/test-plan.md)。已暴露的 RPC 动作 6 个（`ping`、`session/create`、`session/get`、`session/list`、`session/delete`、`turn/answer`），
-> 切片 S3–S6 实现后才进 `ACTIONS`（契约 lint 强制双向一致）。
+> `lib/director.mjs`（按难度定措辞、结论式回答追问一次）、`lib/scorer.mjs`（六维评分 + 越界钳制 + 无证据重试 + 空答 0 分）、
+> `lib/store.mjs`（原子写、2 MB 写前拦截）、`lib/report.mjs`（六维雷达 + Top3 短板 + Markdown 导出），
+> 共 99 条测试全绿。用例与覆盖矩阵见 [`docs/test-plan.md`](docs/test-plan.md)。已暴露的 RPC 动作 8 个（`ping`、`session/create`、`session/get`、`session/list`、`session/finish`、`session/delete`、`turn/answer`、`report/export`），
+> 剩余切片 S6、S7 实现后才进 `ACTIONS`（契约 lint 强制双向一致；当前 8 个已实现动作全部登记）。
 
 ## 为什么要有它
 
@@ -45,6 +46,8 @@ node "D:/agent/DeepseekHarness/resources/runtime/primary-runtime/dependencies/pn
 | `npm run e2e` | 打包契约 e2e |
 | `npm run coverage` | 覆盖率，核心 `lib/**` ≥ 85% 否则失败 |
 
+S5 报告导出：`session/finish` 幂等、`report/export` 只写工作目录内、撞名加后缀（上限 99），未考察维度不拉低总分。
+
 ## 验证状态（2026-11-23）
 
 Node `v24.20.0` / npm `11.19.0` 下实跑：
@@ -53,10 +56,10 @@ Node `v24.20.0` / npm `11.19.0` 下实跑：
 |---|---|---|---|---|
 | `npm install` | 0 依赖，无报错 | 同上 | 同上 | 同上 |
 | `npm run build` | 3 个入口文件语法通过 | 3 个入口文件语法通过 | `node --check` 通过 | `node --check` 通过 |
-| `npm run lint` | `0 error(s), 0 warning(s), 7 file(s) scanned` | `0 error(s), 0 warning(s), 7 file(s) scanned`（新增 tables 检查） | `0 error(s), 0 warning(s), 13 file(s) scanned` | `0 error(s), 0 warning(s), 22 file(s) scanned` |
-| `npm test` | 14 passed / 0 failed / 0 skipped | 19 passed / 0 failed / 0 skipped | 31 tests：19 passed / 12 failed（预期红） | **63 tests：63 passed / 0 failed / 0 skipped** |
+| `npm run lint` | `0 error(s), 0 warning(s), 7 file(s) scanned` | `0 error(s), 0 warning(s), 7 file(s) scanned`（新增 tables 检查） | `0 error(s), 0 warning(s), 13 file(s) scanned` | `0 error(s), 0 warning(s), 22 file(s) scanned` | `0 error(s), 0 warning(s), 29 file(s) scanned` |
+| `npm test` | 14 passed / 0 failed / 0 skipped | 19 passed / 0 failed / 0 skipped | 31 tests：19 passed / 12 failed（预期红） | 63 passed（S3） | **99 passed / 0 failed / 0 skipped**（S5） |
 | `npm run e2e` | 6 passed | 6 passed | 6 passed（未变动） | 6 passed |
-| `npm run coverage` | 行 98.77% / 分支 87.80% | 行 99.02% / 分支 87.80% | 行 99.18% / 分支 88.89%（桩函数被调用即计覆盖，不可作依据） | 行 99.66% / 分支 85.02% | **行 99.75% / 分支 87.06%**（S4 落盘存储接进 dispatch，S4b/S4c 补齐错误路径） |
+| `npm run coverage` | 行 98.77% / 分支 87.80% | 行 99.02% / 分支 87.80% | 行 99.18% / 分支 88.89%（桩函数被调用即计覆盖，不可作依据） | 行 99.66% / 分支 85.02% | **行 99.79% / 分支 85.06%**（S5：`report.mjs` 行覆盖 100%，分支 73.91% 全在 `??` 默认值上） |
 
 那 12 条红色用例（`TC-PRO-001..006` + `TC-SES-001..006`）已在 G4 的 12 个「一轮一用例」提交里全部转绿，
 失败原因从 `Error: not implemented yet: … (G4)` 变为真实边界处理；未改动任何断言。
@@ -65,7 +68,8 @@ Node `v24.20.0` / npm `11.19.0` 下实跑：
 `POST /api/dsh-mock-interview/rpc {"op":"ping"}` → `{"ok":true,"value":{"pong":true,"version":"0.1.0","schemaVersion":1}}`（HTTP 200）；
 `{"op":"nope"}` → `{"ok":false,"error":{"code":"E_UNKNOWN_ACTION"}}`（HTTP 200）。
 
-**未验证**：G3 起的面试流程（画像抽取、出题、评分、报告），当前页面只有连通性自检。
+**未验证**：页面仍未接上真实面试流程（S7），当前 UI 只有连通性自检；`llmBridge` 只用假模型验证过字节流拼接，未对真模型跑通；
+`report/export` 的落盘只在本机 Windows 路径上验证过（`D:/project/…`），未验证只读文件系统下的降级表现。
 
 ## 结构
 

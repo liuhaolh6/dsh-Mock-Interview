@@ -140,10 +140,30 @@ S4b 里两条值得单独说：
 
 | ID | 层 | AC | 场景 | 状态 |
 |---|---|---|---|---|
-| TC-REP-001 | U | AC-8 | 报告含逐题分数、六维雷达、`codeVerified===false` | ⬜ |
-| TC-REP-002 | U | AC-8 | Top3 短板按维度均分升序取前三，且与 `actions` 一一对应 | ⬜ |
-| TC-REP-003 | U | AC-8 | 一题未答 → 报告标注「样本不足」仍可导出 | ⬜ |
-| TC-REP-004 | I | AC-8 | `dir` 传 `../..` → `E_BAD_REQUEST`；正常 `dir` 同名文件追加 `-2` | ⬜ |
+| TC-REP-001 | U | AC-8 | 报告含逐题分数、六维雷达、`codeVerified===false` | ✅ |
+| TC-REP-002 | U | AC-8 | Top3 短板按维度均分升序取前三，且与 `actions` 一一对应 | ✅ |
+| TC-REP-003 | U | AC-8 | 一题未答 → 报告标注「样本不足」仍可导出 | ✅ |
+| TC-REP-004 | I | AC-8 | `dir` 传 `../..` → `E_BAD_REQUEST`；正常 `dir` 同名文件追加 `-2` | ✅ |
+| TC-EDG-040 | U | AC-8 | `exportReport` 缺报告 → `E_BAD_REQUEST` | ✅ |
+| TC-EDG-041 | U | AC-8 | 目录不可建 / 文件不可写 → `E_EXPORT_FAILED` | ✅ |
+| TC-EDG-042 | U | AC-8 | 缺省目录 = `./interview-reports`；绝对路径须在工作目录内 | ✅ |
+| TC-EDG-043 | U | AC-8 | 样本充足时 Markdown 含短板与对应 action | ✅ |
+| TC-EDG-044 | U | AC-8 | 未考察维度记 `null` 且不进短板 | ✅ |
+| TC-EDG-045 | U | AC-8 | 连续导出走后缀，上限 99 次 | ✅ |
+
+**S5 转绿记录（2026-11-23）**：6 条一起转绿 + S5b 五条边界补齐，共 2 个提交。
+`lib/report.mjs` 新建：\`buildReport\`（六维均分、逐题记录、Top3 短板按均分升序）、\`renderMarkdown\`、
+\`resolveExportDir\`（只允许工作目录及其子目录）、\`exportReport\`（同名追加 \`-2\`、\`-3\`…）。
+\`session/finish\` 与 \`report/export\` 接进 dispatch，\`ACTIONS\` 6→**8**。
+
+三处判定写进实现而不是散在文档里：
+- **未考察的维度不进短板**：\`null\` 表示「没考」，不是 0 分；只有测过的维度才参与比惨（TC-EDG-044）。
+- **样本阈值 3**：作答 < 3 题 → \`sampleAdequate:false\`，报告标题带「样本不足，仅供参考」，仍然可以导出。
+- **导出永不覆盖**：撞名就加后缀，上限 99 次（TC-EDG-045 把上限也钉住），越出工作目录直接 \`E_BAD_REQUEST\`。
+
+分支覆盖率：\`report.mjs\` 只有 **73.91%**，但行覆盖 **100%**。缺口全在 \`x ?? y\` 的默认值分支上——
+要么不可达（字段恒存在），要么区分不出行为，硬凑用例只会制造假保护。**如实记录，不作达标主张**；
+门槛（行 99.79% / 分支 85.06%）按全量口径仍然过关。
 
 ### S6 语音降级（AC-5）
 
