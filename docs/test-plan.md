@@ -185,6 +185,23 @@ S4b 里两条值得单独说：
 **TC-VOI-002 移到 S7**：它断言的是客户端文案与设置入口，S6 阶段 `client.js` 还是 G1 骨架，此时写了也验证不了——
 这和 TC-SCR-006 移到 S4 是同一条理由：期望值要落在能观测的层上。
 
+### S6b 宿主模型路由（真机缺陷回归）
+
+| ID | 层 | AC | 场景 | 状态 |
+|---|---|---|---|---|
+| TC-WIR-009 | I | AC-3/AC-4 | adapter 以 `finish.reason.kind='error'` 失败 → `turn/answer` 返回 `E_LLM_UNAVAILABLE`，消息里带 `failure.message` | ✅ |
+| TC-WIR-010 | I | AC-3 | adapter 以 `finish.reason.kind='aborted'` 结束 → `E_LLM_TIMEOUT` | ✅ |
+| TC-WIR-011 | I | AC-4 | 默认选择被用作路由：`stream` 收到的 `provider`/`model` 等于 `agentDefaultModel.currentSelection()`，`text-delta` 正确拼接并出分 | ✅ |
+| TC-WIR-012 | I | AC-4 | 既无默认选择也无 provider 列表 → `E_LLM_UNAVAILABLE`（文案含「默认模型」），不发请求 | ✅ |
+
+**S6b 转绿记录（2026-11-23）**：4 条一起转绿（`tests/integration/llm-bridge.test.mjs`）。
+起因是活体回归里 `turn/answer` 恒返回 `E_SCORE_INVALID`：`llmBridge` 没带 `provider`/`model`，adapter 选不出来，
+流以终止 chunk 返回错误而插件当成空文本，于是「模型没回答」被误报成「评分 JSON 不可解析」。
+
+**夹具修正（不是断言放宽）**：`TC-EDG-026` 的假 scope 原本没有 `agentDefaultModel`，在契约要求路由之后它必然失败；
+给假宿主补上 `currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-chat' })`，
+断言（turn 能成功、能出分）一字未改。
+
 ## 4. 红基线（G3 门禁）
 
 要求三条：①用例可复现失败；②失败原因对应用例；③无 flaky（连跑三次失败集合一致）。

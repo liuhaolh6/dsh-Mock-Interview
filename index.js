@@ -18,7 +18,7 @@ import { homedir } from 'node:os'
 
 import { ACTIONS, ERROR_CODES, LIMITS, RPC_PATH, SCHEMA_VERSION } from './lib/contracts.js'
 import { decideProbe } from './lib/director.mjs'
-import { isContractError } from './lib/errors.mjs'
+import { ContractError, isContractError } from './lib/errors.mjs'
 import { buildReport, exportReport } from './lib/report.mjs'
 import { buildPlan } from './lib/session.mjs'
 import { scoreAnswer } from './lib/scorer.mjs'
@@ -276,17 +276,82 @@ async function handle(req, res, deps) {
  *
  * @param {object} scope Cordis scope
  */
+/**
+ * Which provider and model to call. `GenerateOptions` requires both, and the
+ * adapter is selected by `provider`, so a call without a route never reaches a
+ * model. The default selection is the user's own choice; the provider list is
+ * only a fallback for a host that has none yet.
+ *
+ * @param {object} scope Cordis scope with services
+ * @param {object} llm the `llm` service
+ * @returns {Promise<{ provider: string, model: string } | undefined>}
+ */
+async function defaultRoute(scope, llm) {
+  try {
+    const service = typeof scope?.get === 'function' ? scope.get('agentDefaultModel') : undefined
+    const selection = typeof service?.currentSelection === 'function' ? service.currentSelection() : undefined
+    const provider = selection?.provider ?? selection?.providerId
+    const model = selection?.model ?? selection?.modelId
+    if (typeof provider === 'string' && provider !== '' && typeof model === 'string' && model !== '') {
+      return { provider, model }
+    }
+  } catch {
+    // A host without a readable default still deserves the provider list.
+  }
+  try {
+    if (typeof llm?.listProviders !== 'function' || typeof llm?.listModels !== 'function') return undefined
+    const providers = llm.listProviders()
+    const first = Array.isArray(providers) ? providers[0] : undefined
+    const provider = first?.id ?? first?.provider
+    if (typeof provider !== 'string' || provider === '') return undefined
+    const models = await llm.listModels(provider)
+    const model = Array.isArray(models) ? models[0]?.id : undefined
+    if (typeof model !== 'string' || model === '') return undefined
+    return { provider, model }
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Adapt `ctx.llm.stream` into the plain `complete({ system, messages })` the
+ * engine modules take. Adapter failures are terminal `finish` chunks rather
+ * than thrown errors, so they are translated here; an empty reply is a failure
+ * too, because the scorers would otherwise report it as unparseable JSON.
+ *
+ * @param {object} scope Cordis scope with services
+ * @returns {((request: object) => Promise<string>) | undefined}
+ */
 function llmBridge(scope) {
   const llm = typeof scope?.get === 'function' ? scope.get('llm') : undefined
   if (llm === undefined || typeof llm.stream !== 'function') return undefined
   return async ({ system, messages, signal }) => {
+    const route = await defaultRoute(scope, llm)
+    if (route === undefined) {
+      throw new ContractError('E_LLM_UNAVAILABLE', '宿主没有可用的默认模型，无法评分')
+    }
     const parts = []
-    const stream = llm.stream({ system, messages, signal, purpose: 'dsh-mock-interview' })
+    let failure
+    const stream = llm.stream({ ...route, system, messages, signal, purpose: 'dsh-mock-interview' })
     for await (const chunk of stream) {
+      if (chunk?.type === 'finish') {
+        const kind = chunk.reason?.kind
+        if (kind === 'aborted') {
+          failure = new ContractError('E_LLM_TIMEOUT', '模型调用超时或被取消')
+        } else if (kind === 'error') {
+          failure = new ContractError('E_LLM_UNAVAILABLE', chunk.reason?.failure?.message || '模型调用失败')
+        }
+        continue
+      }
       const text = chunk?.text ?? chunk?.delta ?? chunk?.content
       if (typeof text === 'string') parts.push(text)
     }
-    return parts.join('')
+    if (failure !== undefined) throw failure
+    const answer = parts.join('')
+    if (answer.trim() === '') {
+      throw new ContractError('E_LLM_UNAVAILABLE', '模型没有返回任何文本')
+    }
+    return answer
   }
 }
 

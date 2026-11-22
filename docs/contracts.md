@@ -119,6 +119,20 @@
 | `inputMode:"voice"` 且 `answer` 有内容 | 与文字作答完全同一条评分路径，turn 上记 `inputMode:"voice"` | — | — |
 
 三种失败**都不落盘**：不会产生半条 turn，也不会把音频写进会话文件（`tests/integration/voice.test.mjs` 用正则断言会话 JSON 里没有 `audio|base64|blob`）。
+### 3.6.2 模型调用的路由与失败语义（S6b 实现记录）
+
+所有需要模型的动作用同一条宿主通道：`ctx.llm.stream(options)`。
+
+- **必须带路由**：`GenerateOptions` 要求 `provider` 与 `model`，`provider` 决定 adapter。插件按序取：
+  1. `agentDefaultModel.currentSelection()` 的 `provider` / `model`（用户自己选的默认模型）；
+  2. `llm.listProviders()` 的第一个 provider + `llm.listModels(provider)` 的第一个 model（宿主还没选过默认值时的兜底）；
+  3. 都没有 → `E_LLM_UNAVAILABLE`（文案「宿主没有可用的默认模型，无法评分」），**不**发一个没有路由的请求。
+- **失败是 chunk 不是异常**：adapter 出错时流以终止 chunk 返回，不抛异常。
+  - `finish.reason.kind === 'error'` → `E_LLM_UNAVAILABLE`，消息取 `failure.message`；
+  - `finish.reason.kind === 'aborted'` → `E_LLM_TIMEOUT`；
+  - 流结束但**文本为空** → `E_LLM_UNAVAILABLE`（否则下游只会报出令人误解的「评分 JSON 不可解析」）。
+- **只拼文本增量**：`text-delta` 的 `text`（兼容历史形状里的 `delta`/`content`）；`reasoning-delta` 不进答案。
+
 ### 3.7 `code/review`
 - 请求：`{ "op": "code/review", "sessionId": "...", "questionId": "q3", "language": "java", "code": "…" }`
 - 响应：`{ "score": ScoreCard, "verdict": "presumed-correct|presumed-wrong|unverifiable", "cases": [{ input, expected, actual, ok }], "executed": false }`

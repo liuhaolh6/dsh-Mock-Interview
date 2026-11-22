@@ -136,6 +136,10 @@ test('TC-EDG-026 the host adapter streams a real turn through ctx.llm', async ()
       get(name) {
         if (name === 'webServer') return server
         if (name === 'llm') return llm
+        // The bridge names a provider and model; a host always has a default.
+        if (name === 'agentDefaultModel') {
+          return { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-chat' }) }
+        }
         return undefined
       },
       effect(run) {
