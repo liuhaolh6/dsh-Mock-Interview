@@ -34,6 +34,21 @@ DeepSeek Harness 插件：**模拟技术面试官**。把简历和目标岗位�
 | `npm run e2e` | 打包契约 e2e |
 | `npm run coverage` | 覆盖率，核心 `lib/**` ≥ 85% 否则失败 |
 
+## 验证状态（2026-11-23，G1）
+
+Node `v24.20.0` / npm `11.19.0` 下实跑：
+
+| 命令 | 结果 |
+|---|---|
+| `npm install` | 0 依赖，无报错 |
+| `npm run build` | 3 个入口文件语法通过 |
+| `npm run lint` | `0 error(s), 0 warning(s), 7 file(s) scanned` |
+| `npm test` | 14 passed / 0 failed / 0 skipped |
+| `npm run e2e` | 6 passed |
+| `npm run coverage` | 行 98.77% / 分支 87.80%（`index.js` 与 `lib/**`） |
+
+**未验证**：活体装载（link 进 profile 后重启 Web 端、侧栏图标出现、页面能打开）——这一步需要重启 DSH，尚未执行，因此 G1 门禁的「页面能打开」仍待现场确认。
+
 ## 结构
 
 ```
@@ -58,6 +73,8 @@ docs/                 需求卡、ADR、用例表、验收清单、交付报告
 ## 协议
 
 本项目按 `D:\project\04-docs\ai-coding-protocol.md` 的 L3 流程推进，章程见 `D:\project\04-docs\mock-interview-charter.md`。
+
+仓库：<https://github.com/liuhaolh6/dsh-Mock-Interview>　需要 Node `^22.19.0 || >=24.0.0`。
 
 ## License
 
