@@ -121,6 +121,22 @@
 > `sed -E 's/ \([0-9.]+ms\)$//'` 去掉耗时，或只抽取 `TC-[A-Z]+-[0-9]+`。红基线脚本：
 > `D:\project\06-temp\red-baseline\check.sh`（临时工具，不进仓库）。
 
+**S1 转绿记录（2026-11-23，G4 前 12 轮）**：按「一轮一用例、只改实现」推进，
+`TC-PRO-001..006` → `3f500cf` / `834cc8c` / `d0ed975` / `45f75bf` / `b7182ad` / `124cd65`，
+`TC-SES-001..006` → `747adb9` / `4c13e2c` / `b3ea3fe` / `0e8f799` / `92e56eb` / `6ddd027`（共 12 提交）。
+每轮先红后绿，未改动任何用例断言。终态：
+
+```
+npm run build    → 通过
+npm run lint     → 0 error(s), 0 warning(s), 13 file(s) scanned
+npm test         → tests 31 / pass 31 / fail 0 / skipped 0
+npm run e2e      → tests 6 / pass 6 / fail 0
+npm run coverage → 行 98.53% / 分支 84.21%（index.js 98.36/87.50；lib/ 100/…）
+```
+
+分支覆盖率 84.21% 尚未到 85%，缺口在 `profile.mjs` 的围栏解析与重试回退分支；
+S2/S3 补上边界用例后应自然越过，**不作为 S1 的验收主张**。
+
 ## 5. 执行与判定
 
 ```bash

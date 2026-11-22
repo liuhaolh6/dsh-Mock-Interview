@@ -2,7 +2,11 @@
 
 DeepSeek Harness 插件：**模拟技术面试官**。把简历和目标岗位喂进去，它会按真实面试的节奏连问你——八股、简历项目深挖、手撕代码、行为面——支持文字和语音作答，每题给分并指出「哪句答错、缺什么、怎么补」，最后导出一份可复盘的 Markdown 报告。
 
-> 当前状态：**G3 测试预置（S1 红基线已过）**。G1 已收口（骨架 + 挂载 + 活体 RPC 实测），G2 已收口（契约）。用例表见 [`docs/test-plan.md`](docs/test-plan.md)，覆盖矩阵与红基线记录都在里面：当前 31 条测试里 12 条是 S1 的红色用例（`TC-PRO-*` / `TC-SES-*`），实现还留在 `not implemented yet` 桩上，进入 G4 后逐条转绿。已实现的动作仍只有 `ping`。
+> 当前状态：**G4 进行中（切片 S1 已全绿）**。G1 骨架与挂载、G2 契约、G3 红基线均已收口。
+> `lib/profile.mjs`（简历+JD → 画像，含一次纠正重试与 `E_PROFILE_INVALID`/`E_LLM_TIMEOUT` 映射）与
+> `lib/session.mjs`（按时长定额、按本人技能/项目定靶、必含一道手撕）已实现并通过 12 条用例；
+> 用例与覆盖矩阵见 [`docs/test-plan.md`](docs/test-plan.md)。已暴露的 RPC 动作仍只有 `ping`，
+> 切片 S2–S6 实现后才进 `ACTIONS`（契约 lint 强制双向一致）。
 
 ## 为什么要有它
 
@@ -46,16 +50,17 @@ node "D:/agent/DeepseekHarness/resources/runtime/primary-runtime/dependencies/pn
 
 Node `v24.20.0` / npm `11.19.0` 下实跑：
 
-| 命令 | G1 收口 | G2 契约后 | G3 红基线（当前） |
-|---|---|---|---|
-| `npm install` | 0 依赖，无报错 | 同上 | 同上 |
-| `npm run build` | 3 个入口文件语法通过 | 3 个入口文件语法通过 | `node --check` 通过 |
-| `npm run lint` | `0 error(s), 0 warning(s), 7 file(s) scanned` | `0 error(s), 0 warning(s), 7 file(s) scanned`（新增 tables 检查） | `0 error(s), 0 warning(s), 13 file(s) scanned` |
-| `npm test` | 14 passed / 0 failed / 0 skipped | 19 passed / 0 failed / 0 skipped | **31 tests：19 passed / 12 failed（预期红）** |
-| `npm run e2e` | 6 passed | 6 passed | 6 passed（未变动） |
-| `npm run coverage` | 行 98.77% / 分支 87.80% | 行 99.02% / 分支 87.80% | 行 99.18% / 分支 88.89%（**桩函数被调用即计覆盖，此数不可作为 G4 依据**） |
+| 命令 | G1 收口 | G2 契约后 | G3 红基线 | G4 切片 S1（当前） |
+|---|---|---|---|---|
+| `npm install` | 0 依赖，无报错 | 同上 | 同上 | 同上 |
+| `npm run build` | 3 个入口文件语法通过 | 3 个入口文件语法通过 | `node --check` 通过 | `node --check` 通过 |
+| `npm run lint` | `0 error(s), 0 warning(s), 7 file(s) scanned` | `0 error(s), 0 warning(s), 7 file(s) scanned`（新增 tables 检查） | `0 error(s), 0 warning(s), 13 file(s) scanned` | `0 error(s), 0 warning(s), 13 file(s) scanned` |
+| `npm test` | 14 passed / 0 failed / 0 skipped | 19 passed / 0 failed / 0 skipped | 31 tests：19 passed / 12 failed（预期红） | **31 tests：31 passed / 0 failed / 0 skipped** |
+| `npm run e2e` | 6 passed | 6 passed | 6 passed（未变动） | 6 passed |
+| `npm run coverage` | 行 98.77% / 分支 87.80% | 行 99.02% / 分支 87.80% | 行 99.18% / 分支 88.89%（桩函数被调用即计覆盖，不可作依据） | 行 98.53% / 分支 84.21%（分支未到 85%，缺口在围栏解析分支，待 S2/S3 补） |
 
-红基线 12 条 = `TC-PRO-001..006`（`lib/profile.mjs`）+ `TC-SES-001..006`（`lib/session.mjs`），失败原因均为 `Error: not implemented yet: … (G4)`；连跑三次失败集合逐条一致。
+那 12 条红色用例（`TC-PRO-001..006` + `TC-SES-001..006`）已在 G4 的 12 个「一轮一用例」提交里全部转绿，
+失败原因从 `Error: not implemented yet: … (G4)` 变为真实边界处理；未改动任何断言。
 
 **活体验证（已通过）**：插件以 `link:` 装入 `profiles/desktop` 并出现在 `dsh.profile.bundles` 后重启 Web 端，侧栏图标出现、页面可打开；
 `POST /api/dsh-mock-interview/rpc {"op":"ping"}` → `{"ok":true,"value":{"pong":true,"version":"0.1.0","schemaVersion":1}}`（HTTP 200）；
