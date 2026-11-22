@@ -63,6 +63,27 @@
 | TC-SCR-005 | U | AC-4 | 维度缺失一项 → 补 `null` 并标 `warnings`，不整体失败 | 🟢 |
 | TC-SCR-006 | I | AC-4 | `turn/answer` 端到端：作答后 `session.turns[0].score.dims` 六键齐全 | ⏭ 移至 S4（依赖会话存储与 dispatch 接线，与 TC-SES-007 同批） |
 
+### S2b 边界补齐（覆盖率用，非新功能）
+
+补 S2 实现里被漏掉的判分/措辞分支，防止「行覆盖高、分支全漏」。
+
+| ID | 层 | AC | 场景 | 状态 |
+|---|---|---|---|---|
+| TC-EDG-001 | U | — | `isContractError` 只认自己的类型：`ContractError` / 普通 `Error` / `null` | 🟢 |
+| TC-EDG-002 | U | — | 未知难度（`god-tier`）是编程错误，直接抛，不降级 | 🟢 |
+| TC-EDG-003 | U | AC-2 | project / code / behavior / knowledge 四种题型各自措辞不同；无 topic 时回退到 target | 🟢 |
+| TC-EDG-004 | U | AC-4 | 维度值是非数字字符串（`"4"`）→ 记 0 + warning，六键仍在 | 🟢 |
+| TC-EDG-005 | U | — | `stripFence` / `tryParseObject` 容忍围栏，拒绝数组与标量 | 🟢 |
+| TC-EDG-006 | U | AC-2 | 无 topic 的题：`skill:Redis` 直接进题干；target 非字符串时回退「你简历里的项目」 | 🟢 |
+| TC-EDG-007 | U | AC-1 | 非 abort 的模型异常（`socket hang up`）原样抛出，不被吞成超时 | 🟢 |
+| TC-EDG-008 | U | AC-4 | 均分 4.2 → `strong`，均分 3.0 → `ok`（阈值 4.0 / 3.0） | 🟢 |
+| TC-EDG-009 | U | — | `ContractError` 不给 message 时，message 等于 code | 🟢 |
+
+> **已记录的设计取舍**：非手撕题 `code` 维固定 0 且**计入**均分，因此这类题的理论最高总分为
+> 25/6 ≈ **4.2**，`strong`（≥4.0）仍可达但拿不到 5.0；这是契约 §2.4 的既有口径（示例中
+> `code: 0` 参与平均），后续若要改「只在适用维度上平均」，属于契约变更，需改 §2.4 并同步
+> TC-SCR-001 / TC-EDG-008 的期望值。
+
 ### S3 手撕评审（AC-6）
 
 | ID | 层 | AC | 场景 | 状态 |
