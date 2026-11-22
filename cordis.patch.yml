@@ -1,0 +1,7 @@
+# Bundle patch layer: inserts this package into the composition. The row loads
+# the package main entry as the host half (a plain Cordis plugin); the
+# `dsh.client` declaration in package.json makes the web app load ./client as
+# the browser half (one sidebar icon + the `main` page it opens).
+- insert:
+    - id: dsh-mock-interview
+      name: dsh-mock-interview
