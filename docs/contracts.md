@@ -115,7 +115,7 @@
 - 请求：`{ "op": "turn/answer", "sessionId": "...", "questionId": "q1", "answer": "…", "inputMode": "text|voice" }`
 - 响应：`{ "score": ScoreCard, "next": { "type": "probe|question|finish", "question"?: Question }, "sessionStatus": "running|finished" }`
 - 失败：`E_SESSION_FINISHED`、`E_SESSION_NOT_FOUND`、`E_BAD_REQUEST`（答案超 4 000 字）、`E_SCORE_INVALID`、`E_LLM_TIMEOUT`。
-- 边界：空答案视为「不会」→ 记 0 分并追问一次，不报错；同一 `questionId` 重复提交以最后一次为准（覆盖）。
+- 边界：空答案视为「不会」→ 记 0 分；第一次空答追问一次，**连续两次空答即跳过该题**（见 §3.6.3）；同一 `questionId` 重复提交以最后一次为准（覆盖）。
 - 幂等：否（每次提交推进一题）。
 
 ### 3.6.1 语音作答的降级语义（S6 实现记录）
@@ -130,6 +130,17 @@
 | `inputMode:"voice"` 且 `answer` 有内容 | 与文字作答完全同一条评分路径，turn 上记 `inputMode:"voice"` | — | — |
 
 三种失败**都不落盘**：不会产生半条 turn，也不会把音频写进会话文件（`tests/integration/voice.test.mjs` 用正则断言会话 JSON 里没有 `audio|base64|blob`）。
+### 3.6.3 连续空答的跳过语义（v0.2 B3 实现记录）
+
+会话上记 `emptyStreak`：空答 +1，有内容归零。
+
+| `emptyStreak` | 结果 |
+| --- | --- |
+| 1（第一次空答） | 记 0 分评分卡，追问一次（`next.type: "probe"`），原因「考生没有作答…」 |
+| ≥2（连续第二次） | 记 0 分评分卡，**不追问**，直接下一题（`next.type: "question"`）或结束 |
+
+理由是「卡住」和「答得浅」不是一回事：同一题问到第三次只会消耗剩余题量。分数照记，报告里这一题仍是 0 分。
+
 ### 3.6.2 模型调用的路由与失败语义（S6b 实现记录）
 
 所有需要模型的动作用同一条宿主通道：`ctx.llm.stream(options)`。
@@ -227,6 +238,14 @@
   - 空 `tags: []` 是合法值（表示清空标签）；空 `title: ""` 不合法（标题不允许被清空）。
   - 更新后的会话仍可继续作答（`status` 不变），改名不会影响 `plan`/`turns`。
 - 幂等：是（同样的 patch 连打两次结果一致，只有 `updatedAt` 变化）。
+
+题库是数据（v0.2 B3 实现记录）
+
+- 文件 `data/bank.json`，结构 `{ version, topics: [{ id, topic, kind, keywords }] }`；`kind: "code"` 的题目强制走手撕分支。
+- 数组顺序就是默认提问顺序；`keywords` 只用于按岗位匹配排序，不影响展示文案。
+- 匹配算法：把画像的 `skills` + `jd.title` + `jd.company` + 各项目 `highlights` 拼成词表，统计每题命中的`keywords`个数，命中多者在前，同分保持文件顺序；未命中的题保持文件顺序排在后面。
+- 题库缺失/损坏/为空 → `E_INTERNAL` 且消息里带文件路径。这是部署故障，不做静默回退（回退会让「改了题库却没生效」无从发现）。
+- `TC-BNK-001` 锁定题库顺序与 v0.1 常量一致，`TC-BNK-002` 锁定缺失即报错。
 
 ### 2.3 `Session` v2 结构与迁移（v0.2 B2 已实现）
 

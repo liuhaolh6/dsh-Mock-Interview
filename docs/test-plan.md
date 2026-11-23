@@ -254,6 +254,20 @@ S2 收口时分支覆盖率只有 **77.78%**（`director.mjs` 50%、`scorer.mjs`
 `TC-SCR-006`（`turn/answer` 端到端）本轮**未做**，原因：它依赖会话存储与 dispatch 接线，
 与 `TC-SES-007` 同属 S4 的集成面，故按 §5 规则先移到 S4，并在用例表标注「⏭ 移至 S4」。
 
+### B3 题库外置与出题质量（v0.2）
+
+| 用例 | 层级 | 守护的东西 |
+| --- | --- | --- |
+| TC-BNK-001 | unit | 外置题库顺序/kind 与 v0.1 常量一致，题目不会因重构洗牌 |
+| TC-BNK-002 | unit | 文件缺失、空 topics 都是 `E_INTERNAL` 且带路径 |
+| TC-BNK-003 | unit | Redis 画像下第一个题库题落在缓存家族，排序真的进入 plan |
+| TC-BNK-004 | unit | 无关技术栈保持文件顺序、题量不变 |
+| TC-BNK-005 | unit | `stackOf` 只收集字符串并 trim |
+| TC-DIR-006 | unit | 连续空答：第 1 次追问、第 2 次跳过 |
+| TC-BNK-006 | unit | 自定义题库路径生效，且 `kind:code` 的题不会因为名字不含「算法」而丢掉手撕 |
+| TC-BNK-101 | integration | 两次空答后 `next.type` 从 probe 变 question，同题只留一条 turn |
+| TC-BNK-102 | integration | 有内容的作答把 `emptyStreak` 归零 |
+
 ## 5. 执行与判定
 
 ```bash

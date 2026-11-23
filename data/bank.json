@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "note": "经典题库。顺序即真实面试的行走顺序：先基本面，再区分「看过博客」和「上过线」。keywords 用于按岗位匹配，不参与展示。",
+  "topics": [
+    { "id": "jvm", "topic": "JVM 内存模型", "kind": "skill", "keywords": ["java", "jvm", "后端", "服务端"] },
+    { "id": "gc", "topic": "GC 分代与调优", "kind": "skill", "keywords": ["java", "jvm", "gc", "性能", "调优"] },
+    { "id": "collections", "topic": "集合源码", "kind": "skill", "keywords": ["java", "集合", "源码"] },
+    { "id": "juc", "topic": "并发包", "kind": "skill", "keywords": ["java", "并发", "多线程", "线程池"] },
+    { "id": "mysql-index", "topic": "MySQL 索引与执行计划", "kind": "skill", "keywords": ["mysql", "sql", "数据库", "索引", "后端"] },
+    { "id": "tx-isolation", "topic": "事务隔离级别", "kind": "skill", "keywords": ["mysql", "事务", "数据库", "分布式"] },
+    { "id": "redis", "topic": "Redis 数据结构与持久化", "kind": "skill", "keywords": ["redis", "缓存", "nosql", "中间件"] },
+    { "id": "cache-failure", "topic": "缓存穿透雪崩", "kind": "skill", "keywords": ["redis", "缓存", "高并发", "后端"] },
+    { "id": "distributed-lock", "topic": "分布式锁", "kind": "skill", "keywords": ["redis", "分布式", "锁", "微服务"] },
+    { "id": "mq-idempotent", "topic": "消息队列幂等", "kind": "skill", "keywords": ["kafka", "rabbitmq", "消息队列", "mq", "幂等"] },
+    { "id": "microservice-split", "topic": "微服务拆分边界", "kind": "skill", "keywords": ["微服务", "架构", "spring cloud", "分布式"] },
+    { "id": "api-idempotent", "topic": "接口幂等设计", "kind": "skill", "keywords": ["接口", "幂等", "api", "后端"] },
+    { "id": "incident", "topic": "线上故障排查", "kind": "skill", "keywords": ["线上", "故障", "运维", "监控", "后端"] },
+    { "id": "rate-limit", "topic": "限流降级", "kind": "skill", "keywords": ["限流", "降级", "高并发", "稳定性"] },
+    { "id": "testability", "topic": "代码可测试性", "kind": "skill", "keywords": ["测试", "单测", "重构", "工程化"] },
+    { "id": "seckill", "topic": "系统设计：秒杀", "kind": "skill", "keywords": ["系统设计", "高并发", "秒杀", "架构"] },
+    { "id": "short-link", "topic": "系统设计：短链", "kind": "skill", "keywords": ["系统设计", "短链", "架构"] },
+    { "id": "algo-list", "topic": "算法：链表", "kind": "code", "keywords": ["算法", "数据结构", "链表"] },
+    { "id": "algo-tree", "topic": "算法：二叉树", "kind": "code", "keywords": ["算法", "数据结构", "二叉树"] },
+    { "id": "algo-dp", "topic": "算法：动态规划", "kind": "code", "keywords": ["算法", "动态规划", "dp"] }
+  ]
+}

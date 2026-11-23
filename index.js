@@ -311,7 +311,15 @@ export async function dispatch(request, deps = {}) {
         // §3.6: re-answering the same question overwrites the earlier turn, and
         // a shallow answer earns exactly one probe (the reason travels with it).
         const previous = (session.turns ?? []).find((turn) => turn?.questionId === item.id)
-        const probe = decideProbe({ answer, alreadyProbed: previous?.probe?.asked === true })
+        // A blank once is "shallow"; a blank twice in a row is "stuck". Track the
+        // streak on the session so the third attempt is skipped instead of probed.
+        const emptyStreak = String(answer).trim() === '' ? (session.emptyStreak ?? 0) + 1 : 0
+        session.emptyStreak = emptyStreak
+        const probe = decideProbe({
+          answer,
+          alreadyProbed: previous?.probe?.asked === true,
+          emptyStreak,
+        })
         const at = now()
         session.turns = [
           ...(session.turns ?? []).filter((turn) => turn?.questionId !== item.id),
