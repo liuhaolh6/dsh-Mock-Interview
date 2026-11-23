@@ -99,6 +99,19 @@ test('TC-UX-011 every render path stays inside the palette wrapper', () => {
   assert.equal(tree.type, 'div', 'the page root must be a div with the page style')
 })
 
+test('TC-UX-014 the page root owns the scrollbar', () => {
+  const slots = loadPanel()
+  const page = slots.find((entry) => entry.options.name === 'main').component
+  const tree = page({ ctx: { get: () => undefined }, t: (key) => key })
+  const style = tree.props?.style ?? {}
+  // The host panel is a fixed-height, non-scrolling box, so a page that only
+  // grows in height gets clipped and the wheel does nothing.
+  assert.equal(style.height, '100%', 'expected the root to fill the panel')
+  assert.equal(style.minHeight, 0, 'expected the flex child to be allowed to shrink')
+  assert.equal(style.overflowY, 'auto', 'expected the root to scroll itself')
+  assert.equal(style.boxSizing, 'border-box', 'expected padding to stay inside 100% height')
+})
+
 test('TC-UX-012 the setup screen offers the speech-to-text endpoint form', () => {
   const slots = loadPanel()
   const page = slots.find((entry) => entry.options.name === 'main').component

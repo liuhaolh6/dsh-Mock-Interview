@@ -538,6 +538,16 @@ ACTIONS 十项全部有实现；UI 侧不重复计算分数，只渲染宿主给
 
 > 面板侧用 CSS 自定义属性 `--mi-*` 承接配色，`contract-lint` 禁止旧的低对比色值回流。
 
+### 返修：面板滚轮划不动（2026-11-24）
+
+用户在真机反馈「那个页面滚轮划不动」。根因是页面根节点只声明了 `maxWidth`，没有 `height`/`overflow`：宿主 `main` 槽给的是一个定高且**不滚动**的盒子（对照 `dsh-collections` 的 `.dsc_root{height:100%}` + `.dsc_main{overflow:auto}`），所以内容超出后被裁掉，滚轮无事可做。
+
+| 用例 ID | 层级 | 对应 AC | 场景 | 期望 |
+| --- | --- | --- | --- | --- |
+| TC-UX-014 | E | AC-9 | 页面根节点必须自持滚动条 | `height === '100%'`、`minHeight === 0`、`overflowY === 'auto'`、`boxSizing === 'border-box'` |
+
+红基线证据：把 `client.js` 换回修复前版本（`git show HEAD:client.js`）跑 `npm run e2e` → `✖ TC-UX-014 ... ℹ pass 19 / ℹ fail 1`；恢复修复后 20/20。
+
 ### C7 报告折叠与复制（v0.3）
 
 | ID | 层级 | 场景 | 断言 |

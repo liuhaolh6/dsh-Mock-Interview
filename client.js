@@ -384,7 +384,23 @@ const ARCHIVED_TAG = '已归档'
     }
 
     const styles = {
-      page: { display: 'flex', flexDirection: 'column', gap: '16px', padding: '26px 30px', maxWidth: '900px' },
+      // The host panel gives the page a fixed-height box and does not scroll it
+      // for us, so the page itself owns the scrollbar (same contract as
+      // dsh-collections' `.dsc_root` + `.dsc_main`). Without height/minHeight the
+      // content grows past the panel and the wheel has nothing to move.
+      page: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+        padding: '26px 30px',
+        maxWidth: '900px',
+        height: '100%',
+        minHeight: 0,
+        boxSizing: 'border-box',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        scrollbarWidth: 'thin',
+      },
       head: { display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' },
       title: { fontSize: '22px', fontWeight: 650, margin: 0 },
       subtitle: { margin: 0, opacity: 0.7, fontSize: '13px', lineHeight: 1.6 },
