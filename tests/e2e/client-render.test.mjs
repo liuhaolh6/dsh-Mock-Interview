@@ -98,3 +98,17 @@ test('TC-UX-011 every render path stays inside the palette wrapper', () => {
   assert.equal(tree.props?.style?.minHeight !== undefined || tree.props?.style !== undefined, true)
   assert.equal(tree.type, 'div', 'the page root must be a div with the page style')
 })
+
+test('TC-UX-012 the setup screen offers the speech-to-text endpoint form', () => {
+  const slots = loadPanel()
+  const page = slots.find((entry) => entry.options.name === 'main').component
+  const tree = page({ ctx: { get: () => undefined }, t: (key) => key })
+  const text = textOf(tree)
+  // D1: the endpoint is configured here, once, and the form starts collapsed so
+  // the first screen still has exactly one primary action.
+  assert.match(text, /asr\.title/, 'expected the endpoint settings section')
+  assert.match(text, /asr\.baseUrl/, 'expected the endpoint URL field')
+  assert.match(text, /asr\.model/, 'expected the model field')
+  assert.match(text, /asr\.apiKey/, 'expected the key field')
+  assert.match(text, /asr\.save/, 'expected the save button')
+})

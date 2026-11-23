@@ -32,7 +32,7 @@ window.__ModuleLoader__.load({
     const ringOff = (event) => {
       event.currentTarget.style.outline = 'none'
     }
-    const { useCallback, useEffect, useState } = React
+    const { useCallback, useEffect, useRef, useState } = React
 
     const NS = 'dsh-mock-interview'
     const PANEL = 'mock-interview'
@@ -86,6 +86,23 @@ window.__ModuleLoader__.load({
         'run.language': '语言',
         'run.voice': '语音作答',
         'run.voice.blocked': '当前没有可用的语音转写（ASR）：请改用文字作答，或在设置里配置自备的 OpenAI 兼容端点。',
+        'run.record': '按住说话（松手转文字）',
+        'run.recording': '正在录音…点击结束',
+        'run.transcribing': '转写中…',
+        'asr.title': '语音转写设置（可选）',
+        'asr.hint': '插件不录存音频：你说的一段只发给下面这个端点，拿到文字后立即丢弃。不配置就只用文字作答。',
+        'asr.baseUrl': '端点地址（OpenAI 兼容，形如 https://host/v1）',
+        'asr.model': '模型名（如 whisper-1）',
+        'asr.apiKey': 'API Key（只存本机，界面不再回显）',
+        'asr.apiKey.ph': '留空则沿用已保存的 Key',
+        'asr.save': '保存语音设置',
+        'asr.clear': '清除语音设置',
+        'asr.saved': '语音设置已保存',
+        'asr.cleared': '语音设置已清除',
+        'asr.transcribed': '已转成文字，确认后提交',
+        'asr.unsupported': '这个环境不支持录音（没有 MediaRecorder）：请改用文字作答',
+        'asr.denied': '麦克风权限被拒绝：请在地址栏允许麦克风，或改用文字作答',
+        'asr.empty': '没有录到声音：请重录，或改用文字作答',
         'run.score': '本题评分',
         'run.overall': '综合',
         'run.next': '下一题',
@@ -238,6 +255,23 @@ window.__ModuleLoader__.load({
         'report.exported': 'Exported:',
         'error.prefix': 'Failed',
         'run.voice.blocked': 'No speech-to-text is available: type your answer, or configure your own OpenAI-compatible endpoint in settings.',
+        'run.record': 'Hold to speak (release to transcribe)',
+        'run.recording': 'Recording… click to stop',
+        'run.transcribing': 'Transcribing…',
+        'asr.title': 'Speech-to-text settings (optional)',
+        'asr.hint': 'No audio is recorded or stored: one clip goes to the endpoint below and is dropped as soon as text comes back. Leave it empty to answer by typing only.',
+        'asr.baseUrl': 'Endpoint URL (OpenAI compatible, e.g. https://host/v1)',
+        'asr.model': 'Model name (e.g. whisper-1)',
+        'asr.apiKey': 'API key (stored locally, never echoed back)',
+        'asr.apiKey.ph': 'Leave empty to keep the saved key',
+        'asr.save': 'Save endpoint',
+        'asr.clear': 'Clear endpoint',
+        'asr.saved': 'Endpoint saved',
+        'asr.cleared': 'Endpoint cleared',
+        'asr.transcribed': 'Transcribed — review it, then submit',
+        'asr.unsupported': 'This environment cannot record (no MediaRecorder): type your answer instead',
+        'asr.denied': 'Microphone permission denied: allow it in the address bar, or type your answer',
+        'asr.empty': 'Nothing was recorded: try again, or type your answer',
         'setup.resume.ph': 'e.g. 3 years of Java backend, owning the order centre at 3k QPS…',
         'setup.jd.ph': 'e.g. Senior Java backend: concurrency, JVM, MySQL index tuning…',
         'busy.hint': 'Waiting for the model, usually 3–10 seconds',
@@ -659,6 +693,14 @@ window.__ModuleLoader__.load({
       const [selected, setSelected] = useState([])
       const [editing, setEditing] = useState(null)
       const [recordMsg, setRecordMsg] = useState('')
+      // D1: the endpoint config lives on the host and comes back masked; the
+      // clip exists only as one request body, never as state we could persist.
+      const [asr, setAsr] = useState(null)
+      const [asrForm, setAsrForm] = useState({ baseUrl: '', model: '', apiKey: '' })
+      const [asrMsg, setAsrMsg] = useState('')
+      const [asrBusy, setAsrBusy] = useState(false)
+      const [recording, setRecording] = useState(false)
+      const recorderRef = useRef(null)
 
       // The palette arrives from the host (see the `ping` action) so the two
       // colour schemes stay in one place, tested for contrast in lib/theme.mjs.
@@ -747,6 +789,127 @@ window.__ModuleLoader__.load({
         }
         setError(`${hint.title}｜${hint.action}（${failure.code}）`)
       }, [t])
+
+      const loadAsr = useCallback(() => {
+        rpc('asr/config', {}).then((result) => {
+          if (!result.ok) return
+          setAsr(result.value)
+          const config = result.value.config ?? {}
+          setAsrForm((current) => ({
+            baseUrl: current.baseUrl === '' ? config.baseUrl ?? '' : current.baseUrl,
+            model: current.model === '' ? config.model ?? '' : current.model,
+            apiKey: '',
+          }))
+        })
+      }, [])
+
+      useEffect(() => {
+        loadAsr()
+      }, [loadAsr])
+
+      const saveAsr = useCallback(() => {
+        setAsrBusy(true)
+        setAsrMsg('')
+        rpc('asr/config', {
+          config: {
+            baseUrl: asrForm.baseUrl.trim(),
+            model: asrForm.model.trim(),
+            apiKey: asrForm.apiKey.trim(),
+          },
+        }).then((result) => {
+          setAsrBusy(false)
+          if (!result.ok) return onError(result)
+          setAsr(result.value)
+          setAsrForm((current) => ({ ...current, apiKey: '' }))
+          setAsrMsg(t('asr.saved'))
+        })
+      }, [asrForm, onError, t])
+
+      const clearAsr = useCallback(() => {
+        setAsrBusy(true)
+        setAsrMsg('')
+        rpc('asr/config', { clear: true }).then((result) => {
+          setAsrBusy(false)
+          if (!result.ok) return onError(result)
+          setAsr(result.value)
+          setAsrMsg(t('asr.cleared'))
+        })
+      }, [onError, t])
+
+      function readBase64(blob) {
+        return new Promise((resolve) => {
+          if (typeof FileReader === 'undefined') return resolve('')
+          const reader = new FileReader()
+          reader.onload = () => {
+            const text = typeof reader.result === 'string' ? reader.result : ''
+            const comma = text.indexOf(',')
+            resolve(comma === -1 ? '' : text.slice(comma + 1))
+          }
+          reader.onerror = () => resolve('')
+          reader.readAsDataURL(blob)
+        })
+      }
+
+      const transcribe = useCallback((audioBase64, mime, durationMs) => {
+        setAsrBusy(true)
+        setError('')
+        rpc('asr/transcribe', { audioBase64, mime, durationMs }).then((result) => {
+          setAsrBusy(false)
+          if (!result.ok) return onError(result)
+          setAnswer(result.value.text)
+          setAsrMsg(t('asr.transcribed'))
+        })
+      }, [onError, t])
+
+      const stopRecording = useCallback(() => {
+        const recorder = recorderRef.current
+        if (recorder === null || recorder === undefined) return
+        recorderRef.current = null
+        setRecording(false)
+        try {
+          recorder.stop()
+        } catch (problem) {
+          /* already stopped by the browser */
+        }
+      }, [])
+
+      const startRecording = useCallback(() => {
+        const scope = typeof window !== 'undefined' ? window : undefined
+        const Recorder = scope === undefined ? undefined : scope.MediaRecorder
+        const devices = scope === undefined ? undefined : scope.navigator?.mediaDevices
+        if (Recorder === undefined || typeof devices?.getUserMedia !== 'function') {
+          setError(t('asr.unsupported'))
+          return
+        }
+        setError('')
+        setAsrMsg('')
+        devices.getUserMedia({ audio: true }).then((stream) => {
+          const recorder = new Recorder(stream)
+          const chunks = []
+          const startedRecordingAt = Date.now()
+          recorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) chunks.push(event.data)
+          }
+          recorder.onstop = () => {
+            stream.getTracks().forEach((track) => track.stop())
+            const mime = String(recorder.mimeType || chunks[0]?.type || 'audio/webm').split(';')[0]
+            readBase64(new Blob(chunks, { type: mime })).then((encoded) => {
+              if (encoded === '') {
+                setError(t('asr.empty'))
+                return
+              }
+              transcribe(encoded, mime, Date.now() - startedRecordingAt)
+            })
+          }
+          recorderRef.current = recorder
+          recorder.start()
+          setRecording(true)
+        }).catch(() => {
+          setError(t('asr.denied'))
+        })
+      }, [t, transcribe])
+
+      const asrReady = asr?.config?.hasKey === true
 
       const extract = useCallback(() => {
         setBusy(true)
@@ -1207,6 +1370,58 @@ window.__ModuleLoader__.load({
                 busy ? t('setup.extracting') : t('setup.extract')),
               busy ? h('span', { style: styles.meta }, t('busy.hint')) : null,
             ),
+            h('details', { style: { marginTop: '14px' } },
+              h('summary', { style: { cursor: 'pointer' } },
+                t('asr.title') + (asrReady ? ' ✓' : '')),
+              h('p', { style: styles.meta }, t('asr.hint')),
+              h(Field, { label: t('asr.baseUrl') },
+                h('input', {
+                  style: styles.input,
+                  value: asrForm.baseUrl,
+                  placeholder: 'https://api.example.com/v1',
+                  'aria-label': t('asr.baseUrl'),
+                  onChange: (event) => setAsrForm({ ...asrForm, baseUrl: event.target.value }),
+                  onFocus: ringOn,
+                  onBlur: ringOff,
+                })),
+              h(Field, { label: t('asr.model') },
+                h('input', {
+                  style: styles.input,
+                  value: asrForm.model,
+                  placeholder: 'whisper-1',
+                  'aria-label': t('asr.model'),
+                  onChange: (event) => setAsrForm({ ...asrForm, model: event.target.value }),
+                  onFocus: ringOn,
+                  onBlur: ringOff,
+                })),
+              h(Field, { label: t('asr.apiKey') },
+                h('input', {
+                  style: styles.input,
+                  type: 'password',
+                  value: asrForm.apiKey,
+                  placeholder: t('asr.apiKey.ph'),
+                  'aria-label': t('asr.apiKey'),
+                  onChange: (event) => setAsrForm({ ...asrForm, apiKey: event.target.value }),
+                  onFocus: ringOn,
+                  onBlur: ringOff,
+                })),
+              h('div', { style: styles.row },
+                h('button', {
+                  type: 'button',
+                  style: asrBusy ? styles.primaryOff : styles.primary,
+                  onClick: saveAsr,
+                  disabled: asrBusy,
+                }, t('asr.save')),
+                h('button', {
+                  type: 'button',
+                  style: styles.button,
+                  onClick: clearAsr,
+                  disabled: asrBusy || !asrReady,
+                }, t('asr.clear')),
+                asr !== null && asr.keyMask !== '' ? h('span', { style: styles.meta }, asr.keyMask) : null,
+                asrMsg !== '' ? h('span', { style: styles.meta }, asrMsg) : null,
+              ),
+            ),
             error !== '' ? h('div', { style: styles.bad }, error) : null,
           ),
         )
@@ -1287,7 +1502,16 @@ window.__ModuleLoader__.load({
           h('p', { style: styles.prompt }, item?.topic ?? item?.target ?? ''),
           h('div', { style: styles.row },
             h('button', { type: 'button', style: styles.button, onClick: speak }, t('run.speak')),
-            h('button', { type: 'button', style: styles.button, onClick: voice }, t('run.voice')),
+            asrReady
+              ? h('button', {
+                  type: 'button',
+                  style: recording ? styles.primaryOff : styles.button,
+                  onClick: recording ? stopRecording : startRecording,
+                  disabled: asrBusy || isCode,
+                  onFocus: ringOn,
+                  onBlur: ringOff,
+                }, recording ? t('run.recording') : asrBusy ? t('run.transcribing') : t('run.record'))
+              : h('button', { type: 'button', style: styles.button, onClick: voice }, t('run.voice')),
           ),
           isCode
             ? h(Field, { label: t('run.language') },

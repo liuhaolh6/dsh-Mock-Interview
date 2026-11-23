@@ -277,6 +277,25 @@ S2 收口时分支覆盖率只有 **77.78%**（`director.mjs` 50%、`scorer.mjs`
 | TC-REP-010 | integration | Markdown 含「逐题原文与参考解」、你的回答、参考解、扣分依据与「未真实执行」声明 |
 | TC-REP-011 | integration | 导出历史记录前后会话文件逐字节相同，状态不被改写 |
 
+### D1 语音作答（v0.4）
+
+| ID | 层级 | 场景 | 期望 | 夹具 |
+| --- | --- | --- | --- | --- |
+| TC-ASR-001 | U | 构造转写请求 | multipart，含 `model`/`response_format`/`file`，音频字节原样在内，以收尾 boundary 结束 | 纯函数 |
+| TC-ASR-002 | U | baseUrl 带尾斜杠 / 已写全路径 | 不出现 `//`、不重复路径 | 纯函数 |
+| TC-ASR-003 | U | 缺 baseUrl/apiKey/model | `E_ASR_NOT_CONFIGURED` 且消息点名缺哪个；非 http(s) 则 `E_BAD_REQUEST` | 纯函数 |
+| TC-ASR-004 | U | 转写文本带换行/空白、或为空 | 折叠空白；空文本 → `E_ASR_FAILED` | 纯函数 |
+| TC-ASR-005 | U | 不支持的容器 / 空音频 / 超 8 MB / 超 120 s | `E_BAD_REQUEST`，且都在发送前 | 纯函数 |
+| TC-ASR-006 | U | 密钥回显 | `maskKey` 与 `publicAsrConfig` 不含明文 | 纯函数 |
+| TC-ASR-007 | U | 配置文件读写 | 0600 写入（注入 fs 断言 `mode`）、坏文件视为未配置、可清空 | tmpdir |
+| TC-ASR-010 | I | 未配置时 `asr/transcribe` | `E_ASR_NOT_CONFIGURED`，`fetch` 零调用 | 注入 fetch |
+| TC-ASR-011 | I | 已配置时转写 | 一次调用、URL/鉴权/body 正确、返回折叠后的文字 | 注入 fetch |
+| TC-ASR-012 | I | 端点 502 / 空文本 / 非 JSON / 连接失败 | `E_ASR_FAILED`，`hint.retryable === true` | 注入 fetch |
+| TC-ASR-013 | I | 坏音频六种形态 | `E_BAD_REQUEST`，`fetch` 零调用，目录里只有 `asr.json`（音频不落盘） | 注入 fetch |
+| TC-ASR-014 | I | `asr/config` 读/写/清 | 只回掩码与 `hasKey`；清除后回到未配置；坏端点 `E_BAD_REQUEST` | tmpdir |
+| TC-ASR-015 | I | 部分更新 | 只改 baseUrl/model 时沿用已存 Key，且后续转写真的用了新地址 | tmpdir + fetch |
+| TC-UX-012 | E | setup 首屏渲染 | 出现 `asr.*` 设置区与三个字段、保存按钮 | vm 渲染桩 |
+
 ## 5. 执行与判定
 
 ```bash

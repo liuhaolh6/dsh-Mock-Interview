@@ -17,6 +17,15 @@ import { basename, dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 
 import { ACTIONS, ERROR_CODES, LIMITS, RPC_PATH, SCHEMA_VERSION } from './lib/contracts.js'
+import {
+  buildAsrRequest,
+  configPath,
+  maskKey,
+  normaliseTranscript,
+  publicAsrConfig,
+  readAsrConfig,
+  writeAsrConfig,
+} from './lib/asr.mjs'
 import { explainError } from './lib/messages.mjs'
 import { reviewCode } from './lib/code-review.mjs'
 import { decideProbe } from './lib/director.mjs'
@@ -53,6 +62,11 @@ function fail(code, message) {
     { ok: false, error: { code, message: text, hint: explainError(code, text) } },
     { status: 200, headers: JSON_HEADERS },
   )
+}
+
+/** DSH_HOME for this call: injected in tests, read live in the host. */
+function resolveHome(deps) {
+  return deps.home ?? process.env.DSH_HOME
 }
 
 /** The store for this call: injected in tests, derived from DSH_HOME live. */
@@ -111,6 +125,57 @@ export async function dispatch(request, deps = {}) {
 
   try {
     switch (op) {
+      case 'asr/config': {
+        // §3.14: the endpoint is configured once, in the panel, and the key is
+        // never echoed back — the browser only learns whether one is stored.
+        const home = resolveHome(deps)
+        if (body.clear === true) {
+          await writeAsrConfig({ home, config: null, fs: deps.fs })
+          return ok({ config: publicAsrConfig(null), keyMask: '', path: configPath(home) })
+        }
+        if (body.config !== undefined && body.config !== null) {
+          // A partial update keeps the stored key: the panel never receives it,
+          // so requiring the user to retype it to change the model would be rude.
+          const previous = await readAsrConfig({ home, fs: deps.fs })
+          const patch = {}
+          for (const [key, value] of Object.entries(body.config)) {
+            if (typeof value === 'string' && value.trim() !== '') patch[key] = value
+          }
+          const saved = await writeAsrConfig({ home, config: { ...(previous ?? {}), ...patch }, fs: deps.fs })
+          const stored = await readAsrConfig({ home, fs: deps.fs })
+          return ok({ config: saved, keyMask: maskKey(stored?.apiKey), path: configPath(home) })
+        }
+        const stored = await readAsrConfig({ home, fs: deps.fs })
+        return ok({
+          config: publicAsrConfig(stored),
+          keyMask: maskKey(stored?.apiKey),
+          path: configPath(home),
+        })
+      }
+
+      case 'asr/transcribe': {
+        // §3.13: audio never touches the session store — it is forwarded to the
+        // user's own endpoint and dropped, so nothing here can leak a clip.
+        const home = resolveHome(deps)
+        const audio = decodeAudio(body)
+        const config = await readAsrConfig({ home, fs: deps.fs })
+        if (config === null) {
+          return fail(
+            'E_ASR_NOT_CONFIGURED',
+            '还没有配置语音转写端点：请改用文字作答，或在设置里填写自备的 OpenAI 兼容转写端点',
+          )
+        }
+        const request = buildAsrRequest({
+          ...config,
+          audio,
+          mime: body.mime,
+          language: body.language,
+          durationMs: body.durationMs,
+        })
+        const payload = await callAsr(request, deps)
+        return ok({ text: normaliseTranscript(payload), model: config.model, provider: 'asr' })
+      }
+
       case 'ping':
         // The panel asks which palette to paint itself with; contrast is
         // checked in lib/theme.mjs (TC-THM-001..003) rather than by eye.
@@ -390,6 +455,50 @@ export async function dispatch(request, deps = {}) {
   } catch (problem) {
     if (isContractError(problem)) return fail(problem.code, problem.message)
     throw problem
+  }
+}
+
+/** Decode the base64 clip the panel recorded; a data URL prefix is tolerated. */
+function decodeAudio(body) {
+  const raw = typeof body.audioBase64 === 'string' ? body.audioBase64 : ''
+  if (raw === '') throw new ContractError('E_BAD_REQUEST', '缺少 audioBase64：没有收到录音数据')
+  const encoded = raw.startsWith('data:') ? raw.slice(raw.indexOf(',') + 1) : raw
+  if (!/^[A-Za-z0-9+/=\s]+$/.test(encoded)) {
+    throw new ContractError('E_BAD_REQUEST', 'audioBase64 不是合法的 base64 数据')
+  }
+  // Guard the string before decoding: base64 is 4/3 of the binary size.
+  if (encoded.length > Math.ceil((LIMITS.maxAudioBytes * 4) / 3) + 16) {
+    const mb = Math.round(LIMITS.maxAudioBytes / (1024 * 1024))
+    throw new ContractError('E_BAD_REQUEST', `音频超过 ${mb} MB：请缩短回答，或改用文字作答`)
+  }
+  return Buffer.from(encoded, 'base64')
+}
+
+/** One call to the user's transcription endpoint, mapped onto contract codes. */
+async function callAsr(request, deps) {
+  const doFetch = typeof deps.fetch === 'function' ? deps.fetch : globalThis.fetch
+  if (typeof doFetch !== 'function') {
+    throw new ContractError('E_ASR_FAILED', '宿主没有可用的 fetch，无法调用转写端点')
+  }
+  let response
+  try {
+    response = await doFetch(request.url, {
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+      signal: AbortSignal.timeout(LIMITS.llmTimeoutMs),
+    })
+  } catch (problem) {
+    const detail = problem instanceof Error ? problem.message : String(problem)
+    throw new ContractError('E_ASR_FAILED', `转写端点调用失败：${detail}`)
+  }
+  if (response?.ok !== true) {
+    throw new ContractError('E_ASR_FAILED', `转写端点返回 HTTP ${response?.status ?? 'unknown'}`)
+  }
+  try {
+    return await response.json()
+  } catch {
+    throw new ContractError('E_ASR_FAILED', '转写端点返回的不是 JSON')
   }
 }
 

@@ -14,7 +14,7 @@
 | 响应体 | 成功 `{ "ok": true, "value": <payload> }`；失败 `{ "ok": false, "error": { "code": "E_*", "message": "人类可读" } }` |
 | HTTP 状态 | 业务失败**恒 200**（信封表达错误）；仅传输层/未预期异常为 500 且仍返回同款信封 |
 | 头 | 响应带 `content-type: application/json; charset=utf-8`、`cache-control: no-store` |
-| 请求体上限 | 64 KB（`LIMITS.maxRequestBytes`）；超限 → `E_BAD_REQUEST` |
+| 请求体上限 | 64 KB（`LIMITS.maxRequestBytes`）；超限 → `E_BAD_REQUEST`。唯一例外是 `asr/transcribe`：音频走独立上限 8 MB（`LIMITS.maxAudioBytes`），见 §3.15 |
 | 答案上限 | 单次作答 4 000 字符（`LIMITS.maxAnswerChars`）；简历文本 20 000 字符（`LIMITS.maxResumeChars`） |
 | 会话文件上限 | 2 MB（`LIMITS.maxSessionBytes`）；超限 → `E_SESSION_TOO_LARGE` |
 | LLM 超时 | 45 s（`LIMITS.llmTimeoutMs`）；重试一次后仍失败 → `E_LLM_TIMEOUT` |
@@ -121,6 +121,7 @@
 ### 3.6.1 语音作答的降级语义（S6 实现记录）
 
 宿主**从不接收、也不保存音频**：`turn/answer` 只接受浏览器用自备 ASR 端点转好的文本。
+v0.4 D1 起，转写这一步由 `asr/transcribe`（§3.15）承担：浏览器录一段、发给用户自备的端点、拿回文字，再把文字交给 `turn/answer`。`turn/answer` 本身仍然一个字都不碰音频。
 因此「语音」在本插件里等价于「带 `inputMode` 标记的文字」，失败模式只有三种：
 
 | 请求 | 结果 | 错误码 | 可重试 |
@@ -387,6 +388,41 @@ note: string         // 复盘备注，只在 session/get 里返回全文
 - 会话不存在 → `E_SESSION_NOT_FOUND`（`TC-REP-013`）。
 - 未结束的会话也能预览，用于「先看分再决定要不要收尾」。
 
+### 3.15 `asr/transcribe`（v0.4 D1）
+
+请求：
+
+```json
+{ "op": "asr/transcribe", "audioBase64": "<base64 或 data URL>", "mime": "audio/webm", "durationMs": 4200, "language": "zh" }
+```
+
+响应：`{ "text": "我用的是延迟双删……", "model": "whisper-1", "provider": "asr" }`
+
+- 端点是**用户自备**的 OpenAI 兼容 `/audio/transcriptions`（`multipart/form-data`，字段 `model`、`language`、`response_format=json`、`file`）；插件不内置模型、不下载权重（ADR-0006）。
+- 音频上限 8 MB（`LIMITS.maxAudioBytes`，base64 后约 10.7 MB）、时长上限 120 s（`LIMITS.maxAudioMs`）；两者都在**发送前**拒绝，不消耗端点配额。
+- 容器白名单 `ASR_MIME_TYPES`：`audio/webm`、`audio/ogg`、`audio/mp4`、`audio/wav`；其余 `E_BAD_REQUEST`。
+- 未配置端点 → `E_ASR_NOT_CONFIGURED`（一个字节都不发出去）；端点超时 / 非 2xx / 非 JSON / 空文本 → `E_ASR_FAILED`（可重试）。
+- **音频不落盘、不进会话 JSON**：`TC-ASR-013` 断言 `storages/dsh-mock-interview/` 下只有 `asr.json`，`tests/integration/voice.test.mjs` 继续用正则守会话文件里没有 `audio|base64|blob`。
+- 幂等：否（每调用一次消耗一次端点配额）。
+
+### 3.16 `asr/config`（v0.4 D1）
+
+请求三种形态：
+
+| 目的 | 请求体 | 说明 |
+| --- | --- | --- |
+| 读 | `{ "op": "asr/config" }` | 返回 `config` + `keyMask` + `path` |
+| 写 | `{ "op": "asr/config", "config": { "baseUrl": "...", "model": "...", "apiKey": "..." } }` | 非空字段覆盖，空字段沿用已存值 |
+| 清 | `{ "op": "asr/config", "clear": true }` | 删除 `asr.json`，之后 `asr/transcribe` 回到 `E_ASR_NOT_CONFIGURED` |
+
+响应：`{ "config": { "baseUrl": "", "model": "", "hasKey": false }, "keyMask": "sk-t…ijkl", "path": "<DSH_HOME>/storages/dsh-mock-interview/asr.json" }`
+
+- **密钥只写不读**：浏览器永远拿不回明文，只有 `hasKey: boolean` 与掩码（`TC-ASR-014`）。
+- 部分更新（`TC-ASR-015`）：换模型/换地址不必重输 Key，因为面板本来就看不到它。
+- 落盘文件权限 0600（`TC-ASR-007` 用注入的 fs 断言写调用带 `mode: 0o600`；Windows 无 POSIX 位，故不断言 `stat`）。
+- 坏文件（JSON 损坏、字段缺失）视为「未配置」而不是每次请求都崩。
+- 端点非 http(s) → `E_BAD_REQUEST`；缺字段 → `E_ASR_NOT_CONFIGURED`。
+
 ## 4. 错误码全表
 
 | code | 触发 | 可重试 | 前端表现 |
@@ -404,7 +440,8 @@ note: string         // 复盘备注，只在 session/get 里返回全文
 | `E_LLM_TIMEOUT` | 45 s 未返回（含 1 次重试） | 是 | 「重试」按钮 |
 | `E_SCORE_INVALID` | 评分 JSON 两次都不可解析 | 是 | 保留原答案，可重评 |
 | `E_EXPORT_FAILED` | 写盘失败 | 是 | 显示目标路径与原因 |
-| `E_ASR_NOT_CONFIGURED` | 语音转写未配置 | 否 | 明示降级为文字（AC-5） |
+| `E_ASR_NOT_CONFIGURED` | 未配置转写端点（`asr/config` 为空或缺字段） | 否 | 明示降级为文字，并指到设置（AC-5） |
+| `E_ASR_FAILED` | 自备端点超时 / 非 2xx / 非 JSON / 空文本 | 是 | 「重录」或改文字 |
 
 ## 5. 八问核对
 
@@ -427,4 +464,5 @@ note: string         // 复盘备注，只在 session/get 里返回全文
 | `ACTIONS` | 同上 | ACTIONS ↔ `dispatch` switch 双向比对（lint） |
 | `ERROR_CODES` | 同上 | 代码里 `fail('E_*')` / `code: 'E_*'` 必须已声明（lint） |
 | 枚举与上限 | 同上（`MODES`/`DIFFICULTIES`/`DURATIONS`/`DIMENSIONS`/`LIMITS`） | 单测 TC-CON-005..009 |
+| `ASR_MIME_TYPES`、音频上限、掩码 | `lib/asr.mjs`、`lib/contracts.js` | 单测 TC-ASR-001..007、集成 TC-ASR-010..015 |
 | 未实现动作 | 仅本文件 §3 | 进 `ACTIONS` 即视为已实现，必须带用例 |
