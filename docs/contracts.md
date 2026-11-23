@@ -228,7 +228,7 @@
   - 更新后的会话仍可继续作答（`status` 不变），改名不会影响 `plan`/`turns`。
 - 幂等：是（同样的 patch 连打两次结果一致，只有 `updatedAt` 变化）。
 
-### 2.3 `Session` v2 结构（v0.2 B2 目标，B1 先落字段）
+### 2.3 `Session` v2 结构与迁移（v0.2 B2 已实现）
 
 ```
 schemaVersion: 2
@@ -236,6 +236,25 @@ title: string        // session/create 时自动生成，如「Java 后端 · 11
 tags: string[]       // 用户自定义，参与 session/list 的 query/tag 筛选
 note: string         // 复盘备注，只在 session/get 里返回全文
 ```
+
+| 读到文件 | 行为 |
+| --- | --- |
+| `schemaVersion: 2` | 原样返回 |
+| `schemaVersion: 1`（或无此字段，视为 1） | **只在内存里**补齐 v2 视图（`title` 由 `profile.jd.title` + 创建时间拼出），文件保持原样 |
+| `schemaVersion > 2` | `E_SCHEMA_VERSION`，不读、不写、不备份 |
+| JSON 损坏 / 不是对象 | `E_SESSION_NOT_FOUND` |
+
+写回时（`session/update`、`turn/answer`、`code/review`、`session/finish` 都会写到盘）：
+
+1. 首次把 v1 文件写成 v2 之前，先把**原始字节**复制成 `<id>.json.v1.bak`，只做一次（已有备份就跳过）；
+2. 若盘上文件是更新插件写的（`schemaVersion > 2`），`put` 也拒绝覆写（`E_SCHEMA_VERSION`）——不能拿旧形状盖掉新字段；
+3. 2 MB 上限仍在写盘之前判断，超限时旧文件与备份都不动。
+
+列表索引（`index.json`，与记录同目录）：
+
+- 每个条目记文件 `mtime` 与列表行；`mtime` 未变就不再读正文。
+- 索引是**缓存不是真相**：文件被删则条目消失；文件被外部改动则 `mtime` 变化触发重读；索引损坏（非 JSON、版本不符）则整表重建，不报错。
+- 写索引失败没有任何副作用（只是下一轮变冷）。
 
 
 导出目录的判定（2026-11-23 修订，`TC-REP-004`/`TC-EDG-042` 守护）：

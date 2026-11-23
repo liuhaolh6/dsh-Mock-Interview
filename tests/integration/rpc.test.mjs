@@ -25,7 +25,7 @@ async function call(body, deps) {
 test('TC-RPC-001 ping answers with a pong envelope', async () => {
   const payload = await call({ op: 'ping' }, { now: () => 1234 })
   assert.equal(payload.ok, true)
-  assert.deepEqual(payload.value, { pong: true, version: VERSION, schemaVersion: 1, at: 1234 })
+  assert.deepEqual(payload.value, { pong: true, version: VERSION, schemaVersion: 2, at: 1234 })
 })
 
 test('TC-RPC-002 unknown op is rejected with E_UNKNOWN_ACTION', async () => {

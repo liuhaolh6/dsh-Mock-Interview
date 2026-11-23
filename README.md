@@ -2,12 +2,12 @@
 
 DeepSeek Harness 插件：**模拟技术面试官**。把简历和目标岗位喂进去，它会按真实面试的节奏连问你——八股、简历项目深挖、手撕代码、行为面——支持文字和语音作答，每题给分并指出「哪句答错、缺什么、怎么补」，最后导出一份可复盘的 Markdown 报告。
 
-> 当前状态：**v0.2 B1 — 面试记录增删改查**（v0.1.0 已交付并打点，见 [docs/delivery-report.md](docs/delivery-report.md)；人工验收见 [docs/acceptance.md](docs/acceptance.md)）。v0.2 排期见 [mock-interview-roadmap-v0.2.md](../../04-docs/mock-interview-roadmap-v0.2.md)。
+> 当前状态：**v0.2 B2 — 存储迁移与列表索引**（B1 记录 CRUD 已完成）（v0.1.0 已交付并打点，见 [docs/delivery-report.md](docs/delivery-report.md)；人工验收见 [docs/acceptance.md](docs/acceptance.md)）。v0.2 排期见 [mock-interview-roadmap-v0.2.md](../../04-docs/mock-interview-roadmap-v0.2.md)。
 > 已实现：`lib/profile.mjs`（简历+JD → 画像）、`lib/session.mjs`（按时长定额、按本人技能/项目定靶）、
 > `lib/director.mjs`（按难度定措辞、结论式回答追问一次）、`lib/scorer.mjs`（六维评分 + 适用维度平均 + 越界钳制 + 无证据重试 + 空答 0 分）、
 > `lib/code-review.mjs`（手撕静态评审 + 5 条边界推演，恒 `executed:false`）、`lib/store.mjs`（原子写、2 MB 写前拦截、批量删除）、
-> `lib/history.mjs`（记录改名/标签/备注、搜索筛选、排序分页）、`lib/report.mjs`（六维雷达 + Top3 短板 + Markdown 导出）。
-> 共 **132 条测试全绿**，用例与覆盖矩阵见 [`docs/test-plan.md`](docs/test-plan.md)。已暴露的 RPC 动作 **11 个**（`ping`、`profile/extract`、`session/create|get|list|update|delete|finish`、`turn/answer`、`code/review`、`report/export`），
+> `lib/history.mjs`（记录改名/标签/备注、搜索筛选、排序分页）、`lib/migrate.mjs` 与 `lib/index-cache.mjs`（v1→v2 视图迁移、写前一次性备份、列表索引缓存）、`lib/report.mjs`（六维雷达 + Top3 短板 + Markdown 导出）。
+> 共 **142 条测试全绿**，用例与覆盖矩阵见 [`docs/test-plan.md`](docs/test-plan.md)。已暴露的 RPC 动作 **11 个**（`ping`、`profile/extract`、`session/create|get|list|update|delete|finish`、`turn/answer`、`code/review`、`report/export`），
 > 契约 lint 强制 `ACTIONS` 与 dispatch 双向一致。
 
 ## 为什么要有它
