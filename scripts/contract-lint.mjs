@@ -131,6 +131,29 @@ else note(passed, 'wiring: bundle patch matches package name')
 if (pkg.dsh?.bundle?.patch !== './cordis.patch.yml') note(errors, 'wiring: package.json dsh.bundle.patch is not ./cordis.patch.yml')
 if (pkg.dsh?.client === undefined) note(errors, 'wiring: package.json has no dsh.client (browser half would never load)')
 
+/* i18n and pill labels ----------------------------------------------------- */
+
+// A pill built from raw strings renders as an empty button (the Choice component
+// reads option.value/option.label). Catch the shape before it reaches the UI.
+if (/options:\s*\[\s*'/.test(clientSource)) {
+  note(errors, 'ui: client.js passes raw strings to a Choice (options must be { value, label } objects)')
+} else {
+  note(passed, 'ui: every Choice receives { value, label } options')
+}
+
+// Every t('key') must exist in both the zh and en dictionaries; a missing key
+// silently renders an empty label.
+const dictKeys = new Map()
+for (const match of clientSource.matchAll(/^\s*'([^']+)':/gm)) {
+  dictKeys.set(match[1], (dictKeys.get(match[1]) ?? 0) + 1)
+}
+const usedKeys = new Set([...clientSource.matchAll(/\bt\('([^']+)'\)/g)].map((match) => match[1]))
+for (const key of usedKeys) {
+  const count = dictKeys.get(key) ?? 0
+  if (count === 0) note(errors, `i18n: client.js uses t('${key}') but no dictionary entry exists`)
+  else if (count < 2) note(errors, `i18n: dictionary key "${key}" is missing from one locale (found ${count}, need zh + en)`)
+}
+
 /* report ------------------------------------------------------------------ */
 
 for (const line of passed) console.log(`ok   ${line}`)

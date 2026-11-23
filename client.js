@@ -120,6 +120,7 @@ window.__ModuleLoader__.load({
         'records.deleted': '已删除 {n} 条',
         'records.exportMd': '导出 MD',
         'records.exportJson': '导出 JSON',
+        'report.format.label': '导出格式',
         'report.format.md': 'Markdown',
         'report.format.json': 'JSON',
         'records.score': '得分',
@@ -173,10 +174,33 @@ window.__ModuleLoader__.load({
         'records.deleted': 'Deleted {n}',
         'records.exportMd': 'Export MD',
         'records.exportJson': 'Export JSON',
+        'report.format.label': 'Export format',
         'report.format.md': 'Markdown',
         'report.format.json': 'JSON',
         'records.score': 'Score',
         'records.turns': '{n} questions',
+        'run.score': 'Score',
+        'run.overall': 'Overall',
+        'run.unverified': 'Not executed: the cases below are reasoned from the code, not run.',
+        'report.sample': 'Small sample: fewer than 3 answers, read this as indicative only',
+        'report.radar': 'Six-dimension radar',
+        'report.weak': 'Top three to improve',
+        'report.dir': 'Export directory (empty = host default working directory)',
+        'report.exported': 'Exported:',
+        'error.prefix': 'Failed',
+        'run.voice.blocked': 'No speech-to-text is available: type your answer, or configure your own OpenAI-compatible endpoint in settings.',
+        'setup.resume.ph': 'e.g. 3 years of Java backend, owning the order centre at 3k QPS…',
+        'setup.jd.ph': 'e.g. Senior Java backend: concurrency, JVM, MySQL index tuning…',
+        'busy.hint': 'Waiting for the model, usually 3–10 seconds',
+        'confirm.warnings': 'Parser notes',
+        'run.progress': 'Question {n} / {total}',
+        'run.speak': 'Read aloud',
+        'run.voice': 'Voice answer',
+        'run.language': 'Language',
+        'run.code': 'Your code (not executed, static review only)',
+        'run.answer': 'Your answer (as if a real interviewer were sitting across)',
+        'run.submitting': 'Scoring…',
+        'run.probing': 'Interviewer follow-up',
       },
     }
 
@@ -363,7 +387,8 @@ window.__ModuleLoader__.load({
         'div',
         { style: styles.choiceRow, role: 'group', 'aria-label': props.label ?? '' },
         props.options.map((option) => {
-          const on = String(option.value) === String(props.value)
+          const spec = typeof option === 'object' && option !== null ? option : { value: option, label: String(option) }
+          const on = String(spec.value) === String(props.value)
           return h(
             'button',
             {
@@ -371,9 +396,9 @@ window.__ModuleLoader__.load({
               type: 'button',
               style: on ? styles.choiceOn : styles.choice,
               'aria-pressed': on ? 'true' : 'false',
-              onClick: () => props.onChange(option.value),
+              onClick: () => props.onChange(spec.value),
             },
-            option.label,
+            spec.label,
           )
         }),
       )
@@ -486,7 +511,15 @@ window.__ModuleLoader__.load({
             onChange: (event) => props.onDirChange(event.target.value),
           })),
         h('div', { style: { ...styles.row, marginTop: '16px' } },
-          h(Choice, { value: props.exportFormat, options: ['md', 'json'], labels: props.exportFormatLabels, onChange: props.onFormatChange }),
+          h(Choice, {
+            label: t('report.format.label'),
+            value: props.exportFormat,
+            options: [
+              { value: 'md', label: props.exportFormatLabels.md },
+              { value: 'json', label: props.exportFormatLabels.json },
+            ],
+            onChange: props.onFormatChange,
+          }),
           h('button', { type: 'button', style: props.busy ? styles.primaryOff : styles.primary, onClick: () => props.onExport(props.exportFormat), disabled: props.busy }, t('report.export')),
           h('button', { type: 'button', style: styles.button, onClick: props.onRestart }, t('report.again')),
           props.exportPath !== '' ? h('span', { style: styles.ok }, `${t('report.exported')}${props.exportPath}`) : null,
