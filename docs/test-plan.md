@@ -486,3 +486,15 @@ ACTIONS 十项全部有实现；UI 侧不重复计算分数，只渲染宿主给
 | TC-UX-007 | E | 复制 | 走 `report/preview` + `navigator.clipboard`，有成功/失败两条文案 |
 | TC-UX-008 | E | 忙碌态 | 复制按钮 `disabled: props.busy` |
 
+### 面板渲染冒烟（v0.3.0 返修）
+
+| ID | 层级 | 场景 | 断言 |
+|---|---|---|---|
+| TC-UX-009 | E | 模块装载 | `client.js` 在最小 React 桩下能装载并注册 `sidebar.panellist` 与 `main` |
+| TC-UX-010 | E | 首屏渲染 | 渲染 setup 屏不抛异常，树里能找到标题与简历输入 |
+| TC-UX-011 | E | 页面根 | 根节点是带 `styles.page` 的 `div`（配色变量挂在它上面） |
+
+> 缺陷来源：v0.3 的 C6 把 `const page = ...` 写在组件中部，而 setup 屏在它之前就 `return page(...)`，形成暂时性死区 → 首屏抛 `ReferenceError: Cannot access 'page' before initialization` → 整个面板空白。
+> 修复：把 `themeVars`/`page` 上移到状态声明之后（声明行 673，首次使用行 1008）。
+> 已用「拿 HEAD 的旧 client.js 跑同一套桩」验证这组用例确实会红：`caught as expected: ReferenceError - Cannot access 'page' before initialization`。
+

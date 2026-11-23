@@ -660,6 +660,19 @@ window.__ModuleLoader__.load({
       const [editing, setEditing] = useState(null)
       const [recordMsg, setRecordMsg] = useState('')
 
+      // The palette arrives from the host (see the `ping` action) so the two
+      // colour schemes stay in one place, tested for contrast in lib/theme.mjs.
+      const themeVars = theme === null
+        ? {}
+        : {
+            '--mi-ok': theme.ok,
+            '--mi-bad': theme.bad,
+            '--mi-warn': theme.warn,
+            '--mi-bar': theme.bar,
+          }
+      const page = (...children) => h('div', { style: { ...styles.page, ...themeVars } }, ...children)
+
+
       const items = session?.plan?.items ?? []
       const item = items[index]
       const total = items.length
@@ -1198,18 +1211,6 @@ window.__ModuleLoader__.load({
           ),
         )
       }
-
-      // The palette arrives from the host (see the `ping` action) so the two
-      // colour schemes stay in one place, tested for contrast in lib/theme.mjs.
-      const themeVars = theme === null
-        ? {}
-        : {
-            '--mi-ok': theme.ok,
-            '--mi-bad': theme.bad,
-            '--mi-warn': theme.warn,
-            '--mi-bar': theme.bar,
-          }
-      const page = (...children) => h('div', { style: { ...styles.page, ...themeVars } }, ...children)
 
       const canStart = skillsText.trim() !== '' || projectsText.trim() !== ''
 
