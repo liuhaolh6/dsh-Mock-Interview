@@ -69,6 +69,19 @@ node "D:/agent/DeepseekHarness/resources/runtime/primary-runtime/dependencies/pn
 | C7-1 | 长报告可逐题折叠 | TC-UX-006 | ✅（源码级） |
 | C7-2 | 一键复制与导出同源的 Markdown | `report/preview`（TC-REP-012）+ TC-UX-007 | ✅ |
 
+## v0.4 D1 语音作答验收（2026-11-23）
+
+| # | 验收项 | 证据 | 结论 |
+| --- | --- | --- | --- |
+| D1-1 | 未配端点时录音按钮给出「还没有配置语音转写端点」并指到设置，不报堆栈 | `asr/transcribe` → `E_ASR_NOT_CONFIGURED`（TC-ASR-010，`fetch` 零调用） | ✅ |
+| D1-2 | 配好端点后说一段中文能拿回转写文字 | 转发层 TC-ASR-001/002/011（注入 fetch，参数与字节原样） | ✅（源码级；**未在真机收音**） |
+| D1-3 | 密钥不在面板回显 | `publicAsrConfig` + `maskKey`（TC-ASR-006/014） | ✅ |
+| D1-4 | 音频不落盘、不进会话文件 | TC-ASR-013 目录只剩 `asr.json`；`voice.test.mjs` 正则守会话里无 `audio|base64|blob` | ✅ |
+| D1-5 | 超过 8 MB 或 120 s 在本地就拒绝，不消耗端点配额 | TC-ASR-005/013（发送前抛 `E_BAD_REQUEST`） | ✅ |
+| D1-6 | 端点挂了能重试，文案是人话 | TC-ASR-012（`E_ASR_FAILED` + `hint.retryable`） | ✅ |
+
+**仍未人工验证**：真的对着麦克风说一段、看转写文字落进作答框——需要重启 Web 端并在面板里配一个真实端点。
+
 ## 未覆盖（诚实记录）
 
 - **完整 UI 全流程一次跑通**：第 6–10 步的 RPC 语义已用活体探针逐条验证，页面交互由用户点验到「选项可读 + 页面打开」；从录入到导出的连续点击尚未由人完整走完一轮。
