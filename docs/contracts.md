@@ -97,6 +97,7 @@
 - 失败：`E_PROFILE_INCOMPLETE`（无技能且无项目）、`E_BAD_REQUEST`（枚举越界）、`E_LLM_TIMEOUT`。
 - 边界：`minutes` 越界 → `E_BAD_REQUEST`；`budget` 由 `DURATIONS` 决定 5/9/13，允许 ±2 的实际出题偏差。
 - 幂等：否（每次创建新会话）。
+- **再面一次（v0.4 D2）**：请求加 `{ "fromSessionId": "..." }` 时，`profile`/`mode`/`difficulty`/`minutes` 从该会话继承，显式给出的字段优先；`turns` 清空、标签清空、新 id。题单**重新生成**：上一场问过的靶子作为 `avoid` 传入 `buildPlan`，排到队尾，并按「题库 / 简历」交替取，保证新题单与旧题单不同的题目**不少于一半**（`TC-HIS-211`）。`fromSessionId` 不存在 → `E_SESSION_NOT_FOUND`；空字符串 → `E_BAD_REQUEST`。
 
 ### 3.4 `session/get`
 - 请求：`{ "op": "session/get", "sessionId": "..." }`
@@ -107,7 +108,8 @@
 ### 3.5 `session/list`
 - 请求：`{ "op": "session/list", "limit": 20, "offset": 0, "query": "", "status": "active|finished", "mode": "tech-1|project|algo|behavior", "difficulty": "junior|mid|senior", "tag": "", "sort": "recent|oldest|score" }`（除 `limit` 外全部可缺省）
 - 响应：`{ "sessions": [{ id, title, createdAt, status, mode, difficulty, tags, turns: 5, overall: 3.1 }], "total": 12, "hasMore": true }`
-- 失败：`E_BAD_REQUEST`（`limit` 非 1–100 整数、`offset` 非非负整数、`sort`/`status`/`mode`/`difficulty` 非法枚举）。
+- 失败：`E_BAD_REQUEST`（`limit` 非 1–100 整数、`offset` 非非负整数、`sort`/`status`/`mode`/`difficulty`/`archived` 非法枚举）。
+- **归档过滤（v0.4 D2）**：`archived?: "exclude"|"include"|"only"`，缺省 `exclude`。`stats`/`trend` **默认排除已归档**；`archived:"only"` 时反过来只统计归档，因此「练了多少场、平均几分」不会被归档场次污染（`TC-HIS-222`）。
 - 语义（v0.2 B1）：`query` 对 `title`、`tags`、`note`、`mode`、`difficulty` 做**不区分大小写的子串匹配**；各类筛选与搜索是 AND 关系，互不覆盖；`sort` 缺省 `recent`（`updatedAt` 降序），`oldest` 升序，`score` 按 `overall` 降序且 `null` 排最后；分页在排序之后切片，`hasMore = offset + 本次条数 < total`；响应不返回排序键 `updatedAt`/`note`（列表只给摘要）。
 - 幂等：是。
 
@@ -231,14 +233,15 @@ v0.4 D1 起，转写这一步由 `asr/transcribe`（§3.15）承担：浏览器�
 - 边界：批量删除先删存在的、再返回计数；单个 id 的删除失败（非 `ENOENT`）整体报错，不静默跳过。
 
 ### 3.11 `session/update`（v0.2 B1）
-- 请求：`{ "op": "session/update", "sessionId": "...", "title"?: "...", "tags"?: ["..."], "note"?: "..." }`
+- 请求：`{ "op": "session/update", "sessionId": "...", "title"?: "...", "tags"?: ["..."], "note"?: "...", "archived"?: true|false }`
 - 响应：`{ "session": SessionMeta }`，其中 `SessionMeta = { id, title, tags, note, status, mode, difficulty, createdAt, updatedAt, turns, overall }`
-- 失败：`E_SESSION_NOT_FOUND`；`E_BAD_REQUEST`（三类字段一个都没给；`title` 非字符串或去空白后为空或超 80 字；`tags` 非字符串数组、超 10 个、含空项或单项超 24 字；`note` 非字符串或超 2 000 字）。
+- 失败：`E_SESSION_NOT_FOUND`；`E_BAD_REQUEST`（四类字段一个都没给；`archived` 非布尔；`title` 非字符串或去空白后为空或超 80 字；`tags` 非字符串数组、超 10 个、含空项或单项超 24 字；`note` 非字符串或超 2 000 字）。
 - 语义：
   - **部分更新**：只改给出的字段，未出现的字段保持原值；`title` 会 trim，`tags` 会 trim 并**去重保持首次出现顺序**，`note` 原样保存（不 trim 内部换行，仅整体 trim 首尾）。
   - `updatedAt` 每次成功更新都会推进，但 `createdAt` 不动。
   - 空 `tags: []` 是合法值（表示清空标签）；空 `title: ""` 不合法（标题不允许被清空）。
   - 更新后的会话仍可继续作答（`status` 不变），改名不会影响 `plan`/`turns`。
+  - **`archived`（v0.4 D2）不是新字段**：落盘时只体现为标签 `已归档` 的加减（`ARCHIVED_TAG`），所以 `schemaVersion` 仍是 2、旧文件不用迁移；重复归档不会出现两个标签，取消归档只摘这一个标签、不动用户自己的标签顺序（`TC-HIS-201`）。
 - 幂等：是（同样的 patch 连打两次结果一致，只有 `updatedAt` 变化）。
 
 题库是数据（v0.2 B3 实现记录）
@@ -422,6 +425,15 @@ note: string         // 复盘备注，只在 session/get 里返回全文
 - 落盘文件权限 0600（`TC-ASR-007` 用注入的 fs 断言写调用带 `mode: 0o600`；Windows 无 POSIX 位，故不断言 `stat`）。
 - 坏文件（JSON 损坏、字段缺失）视为「未配置」而不是每次请求都崩。
 - 端点非 http(s) → `E_BAD_REQUEST`；缺字段 → `E_ASR_NOT_CONFIGURED`。
+
+### 3.17 `history/export`（v0.4 D2）
+
+- 请求：`{ "op": "history/export", "dir"?: "...", "archived"?: true }`
+- 响应：`{ "path": ".../history-20261123-235959.json", "bytes": 12345, "count": 6 }`
+- 失败：`E_BAD_REQUEST`（`dir` 不是允许的目录）、`E_EXPORT_FAILED`（建目录或写文件失败）。
+- 语义：把**每一条完整会话**（含 `plan`/`turns`/`report`）打成一个 JSON 包，`schemaVersion: "history-1"`、`exportedAt`、`count`；默认不包含已归档的场次，`archived:true` 时一并带上。文件名带导出时刻，撞名加 `-2`，**从不覆盖**。
+- 与 `report/export` 的区别：报告是给人看的复盘（Markdown/JSON 单场），整包是给机器用的备份（多场、可再导入）。
+- 幂等：否（每次写新文件）。
 
 ## 4. 错误码全表
 

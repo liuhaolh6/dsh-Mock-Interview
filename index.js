@@ -31,8 +31,16 @@ import { reviewCode } from './lib/code-review.mjs'
 import { decideProbe } from './lib/director.mjs'
 import { ContractError, isContractError } from './lib/errors.mjs'
 import { extractProfile } from './lib/profile.mjs'
-import { buildReport, exportReport, renderMarkdown } from './lib/report.mjs'
-import { defaultTitle, listSessions, pickPatch, sessionMeta } from './lib/history.mjs'
+import { buildReport, exportReport, renderMarkdown, resolveExportDir } from './lib/report.mjs'
+import {
+  defaultTitle,
+  exportHistory,
+  historyBundle,
+  isArchived,
+  listSessions,
+  pickPatch,
+  sessionMeta,
+} from './lib/history.mjs'
 import { progressOf, statsOf, trendOf } from './lib/insights.mjs'
 import { emptyReasonFor, readinessOf } from './lib/onboarding.mjs'
 import { pickTheme } from './lib/theme.mjs'
@@ -242,26 +250,42 @@ export async function dispatch(request, deps = {}) {
       }
 
       case 'session/create': {
+        const store = resolveStore(deps)
+        // D2 再面一次：沿用上一场的画像与设置，但题单重新生成（`avoid` 里是
+        // 上一场问过的靶子），否则只是背上一场的答案。
+        let source = null
+        if (body.fromSessionId !== undefined) {
+          if (typeof body.fromSessionId !== 'string' || body.fromSessionId.trim() === '') {
+            return fail('E_BAD_REQUEST', 'fromSessionId 必须是非空字符串')
+          }
+          source = await store.get(body.fromSessionId.trim())
+        }
+        const profile = body.profile ?? source?.profile
+        const mode = body.mode ?? source?.mode
+        const difficulty = body.difficulty ?? source?.difficulty
+        const minutes = body.minutes ?? source?.minutes
+        const avoid = source === null ? undefined : (source.plan?.items ?? []).map((item) => item?.target)
         const plan = await buildPlan({
-          profile: body.profile,
-          mode: body.mode,
-          difficulty: body.difficulty,
-          minutes: body.minutes,
+          profile,
+          mode,
+          difficulty,
+          minutes,
+          ...(avoid === undefined ? {} : { avoid }),
         })
         const at = now()
         const session = {
           schemaVersion: SCHEMA_VERSION,
           id: globalThis.crypto.randomUUID(),
-          title: defaultTitle({ profile: body.profile, createdAt: at }),
+          title: defaultTitle({ profile, createdAt: at }),
           tags: [],
           note: '',
           createdAt: at,
           updatedAt: at,
           status: 'active',
-          mode: body.mode,
-          difficulty: body.difficulty,
-          minutes: body.minutes,
-          profile: body.profile,
+          mode,
+          difficulty,
+          minutes,
+          profile,
           plan,
           turns: [],
         }
@@ -288,17 +312,23 @@ export async function dispatch(request, deps = {}) {
           difficulty: body.difficulty,
           tag: body.tag,
           sort: body.sort,
+          archived: body.archived,
         })
+        // D2：归档的场次不该污染「练了多少场、平均几分」。默认只看没归档的；
+        // 明确 archived:'only' 时才反过来只看归档。
+        const counted = body.archived === 'only' ? rows.filter(isArchived) : rows.filter((row) => !isArchived(row))
         // Aggregates describe the whole filtered list, not just this page, so the
         // stats strip does not jump when the user pages through records.
         return ok({
           ...page,
-          stats: statsOf(rows),
-          trend: trendOf(rows),
+          stats: statsOf(counted),
+          trend: trendOf(counted),
           emptyReason: emptyReasonFor({
             allCount: rows.length,
             pageCount: page.sessions.length,
-            filtered: Boolean(body.query || body.status || body.mode || body.difficulty || body.tag),
+            filtered: Boolean(
+              body.query || body.status || body.mode || body.difficulty || body.tag || body.archived,
+            ),
           }),
         })
       }
@@ -353,6 +383,22 @@ export async function dispatch(request, deps = {}) {
         const session = await resolveStore(deps).get(body.sessionId)
         const report = session.report ?? buildReport(session)
         return ok({ markdown: renderMarkdown(report) })
+      }
+
+      case 'history/export': {
+        const store = resolveStore(deps)
+        const rows = await store.list()
+        const sessions = []
+        for (const row of rows) {
+          // 默认不把归档的场次塞进整包里，除非用户明确要。
+          if (body.archived !== true && isArchived(row)) continue
+          sessions.push(await store.get(row.id))
+        }
+        const exported = await exportHistory({
+          bundle: historyBundle(sessions, { at: now() }),
+          dir: resolveExportDir(body.dir, exportBase(deps)),
+        })
+        return ok(exported)
       }
 
       case 'report/export': {

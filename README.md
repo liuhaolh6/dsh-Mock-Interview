@@ -2,12 +2,12 @@
 
 DeepSeek Harness 插件：**模拟技术面试官**。把简历和目标岗位喂进去，它会按真实面试的节奏连问你——八股、简历项目深挖、手撕代码、行为面——支持文字和语音作答，每题给分并指出「哪句答错、缺什么、怎么补」，最后导出一份可复盘的 Markdown 报告。
 
-> 当前状态：**v0.3.0 已交付**、**v0.4 D1（语音作答）已实现**：配一个自备的 OpenAI 兼容转写端点后，按住说话松手即转文字并走同一条评分链路；不配置就明确降级为文字（体验打磨七批 C1–C7 全部完成：错误人话化、进度感、空态与单主动作、键盘可达性、记录统计与趋势、深浅色跟随、报告折叠与复制；v0.2.0 功能补齐已收口）（v0.1.0 已交付并打点，见 [docs/delivery-report.md](docs/delivery-report.md)；人工验收见 [docs/acceptance.md](docs/acceptance.md)）。v0.2 排期见 [mock-interview-roadmap-v0.2.md](../../04-docs/mock-interview-roadmap-v0.2.md)。
+> 当前状态：**v0.3.0 已交付**、**v0.4 D1（语音作答）+ D2（再面一次 / 归档 / 整包导出）已实现**：配一个自备的 OpenAI 兼容转写端点后，按住说话松手即转文字并走同一条评分链路；不配置就明确降级为文字（体验打磨七批 C1–C7 全部完成：错误人话化、进度感、空态与单主动作、键盘可达性、记录统计与趋势、深浅色跟随、报告折叠与复制；v0.2.0 功能补齐已收口）（v0.1.0 已交付并打点，见 [docs/delivery-report.md](docs/delivery-report.md)；人工验收见 [docs/acceptance.md](docs/acceptance.md)）。v0.2 排期见 [mock-interview-roadmap-v0.2.md](../../04-docs/mock-interview-roadmap-v0.2.md)。
 > 已实现：`lib/profile.mjs`（简历+JD → 画像）、`lib/session.mjs`（按时长定额、按本人技能/项目定靶）、
 > `lib/director.mjs`（按难度定措辞、结论式回答追问一次）、`lib/scorer.mjs`（六维评分 + 适用维度平均 + 越界钳制 + 无证据重试 + 空答 0 分）、
 > `lib/code-review.mjs`（手撕静态评审 + 5 条边界推演，恒 `executed:false`）、`lib/store.mjs`（原子写、2 MB 写前拦截、批量删除）、
-> `lib/history.mjs`（记录改名/标签/备注、搜索筛选、排序分页）、`lib/migrate.mjs` 与 `lib/index-cache.mjs`（v1→v2 视图迁移、写前一次性备份、列表索引缓存）、`lib/bank.mjs`（外置题库按岗位关键词排序）、`lib/report.mjs`（六维雷达 + Top3 短板 + 逐题原文/参考解 + Markdown/JSON 导出）、`lib/messages.mjs`（错误码 → 人能看懂的解释）、`lib/insights.mjs`（进度、统计、趋势）、`lib/onboarding.mjs`（空态原因与「能否开始」）、`lib/theme.mjs`（两套配色与对比度）、`lib/asr.mjs`（自备 OpenAI 兼容端点转写、密钥只写不读、音频不落盘）。
-> 共 **203 条测试 + 18 条 e2e 全绿**，用例与覆盖矩阵见 [`docs/test-plan.md`](docs/test-plan.md)。题库数据在 [`data/bank.json`](data/bank.json)（改题目不用改代码）。已暴露的 RPC 动作 **14 个**（`ping`、`profile/extract`、`session/create|get|list|update|delete|finish`、`turn/answer`、`code/review`、`report/export`、`report/preview`、`asr/config`、`asr/transcribe`），
+> `lib/history.mjs`（记录改名/标签/备注、搜索筛选、排序分页）、`lib/migrate.mjs` 与 `lib/index-cache.mjs`（v1→v2 视图迁移、写前一次性备份、列表索引缓存）、`lib/bank.mjs`（外置题库按岗位关键词排序）、`lib/report.mjs`（六维雷达 + Top3 短板 + 逐题原文/参考解 + Markdown/JSON 导出）、`lib/messages.mjs`（错误码 → 人能看懂的解释）、`lib/insights.mjs`（进度、统计、趋势）、`lib/onboarding.mjs`（空态原因与「能否开始」）、`lib/theme.mjs`（两套配色与对比度）、`lib/asr.mjs`（自备 OpenAI 兼容端点转写、密钥只写不读、音频不落盘）、`lib/history.mjs` 的归档与整包导出（归档只是标签，不改 schema）。
+> 共 **214 条测试 + 18 条 e2e 全绿**，用例与覆盖矩阵见 [`docs/test-plan.md`](docs/test-plan.md)。题库数据在 [`data/bank.json`](data/bank.json)（改题目不用改代码）。已暴露的 RPC 动作 **15 个**（`ping`、`profile/extract`、`session/create|get|list|update|delete|finish`、`turn/answer`、`code/review`、`report/export`、`report/preview`、`history/export`、`asr/config`、`asr/transcribe`），
 > 契约 lint 强制 `ACTIONS` 与 dispatch 双向一致。
 
 ## 为什么要有它

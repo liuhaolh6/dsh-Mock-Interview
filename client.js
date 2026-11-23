@@ -36,6 +36,8 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-mock-interview'
     const PANEL = 'mock-interview'
+// D2: 归档在记录上只是一个标签，与宿主 lib/history.mjs 的 ARCHIVED_TAG 对齐。
+const ARCHIVED_TAG = '已归档'
     const RPC = '/api/dsh-mock-interview/rpc'
     // Languages the review prompt can speak about; the server stores whatever
     // string it is given, so this list is a UI convenience, not a contract.
@@ -170,6 +172,13 @@ window.__ModuleLoader__.load({
         'records.deleted': '已删除 {n} 条',
         'records.exportMd': '导出 MD',
         'records.exportJson': '导出 JSON',
+        'records.again': '再面一次',
+        'records.archive': '归档',
+        'records.unarchive': '取消归档',
+        'records.archived.only': '只看归档',
+        'records.exportAll': '导出全部历史',
+        'records.exported': '已导出：{path}',
+        'records.again.msg': '已开始新的一场：沿用同一份画像，题目重新出过',
         'report.format.label': '导出格式',
         'report.format.md': 'Markdown',
         'report.format.json': 'JSON',
@@ -240,6 +249,13 @@ window.__ModuleLoader__.load({
         'records.deleted': 'Deleted {n}',
         'records.exportMd': 'Export MD',
         'records.exportJson': 'Export JSON',
+        'records.again': 'Run it again',
+        'records.archive': 'Archive',
+        'records.unarchive': 'Unarchive',
+        'records.archived.only': 'Archived only',
+        'records.exportAll': 'Export all history',
+        'records.exported': 'Exported: {path}',
+        'records.again.msg': 'A new run started: same profile, freshly generated questions',
         'report.format.label': 'Export format',
         'report.format.md': 'Markdown',
         'report.format.json': 'JSON',
@@ -690,6 +706,7 @@ window.__ModuleLoader__.load({
       const [, setTick] = useState(0)
       const [recordQuery, setRecordQuery] = useState('')
       const [recordStatus, setRecordStatus] = useState('')
+      const [recordArchived, setRecordArchived] = useState('exclude')
       const [selected, setSelected] = useState([])
       const [editing, setEditing] = useState(null)
       const [recordMsg, setRecordMsg] = useState('')
@@ -1006,9 +1023,12 @@ window.__ModuleLoader__.load({
       const recordsBody = (next = {}) => {
         const query = next.query === undefined ? recordQuery : next.query
         const status = next.status === undefined ? recordStatus : next.status
+        const archived = next.archived === undefined ? recordArchived : next.archived
         const body = { limit: 50 }
         if (typeof query === 'string' && query.trim() !== '') body.query = query.trim()
         if (status !== '') body.status = status
+        // 默认（exclude）由宿主决定，不必显式传；只有「只看归档」才需要说出口。
+        if (archived === 'only') body.archived = 'only'
         return body
       }
 
@@ -1026,7 +1046,7 @@ window.__ModuleLoader__.load({
           setRecordsTrend(result.value.trend ?? [])
           setSelected([])
         })
-      }, [recordQuery, recordStatus, onError])
+      }, [recordQuery, recordStatus, recordArchived, onError])
 
       const copyText = useCallback((text2, key) => {
         // Clipboard is best-effort: a denied permission must not break the view.
@@ -1120,6 +1140,51 @@ window.__ModuleLoader__.load({
           setRecordMsg(t('records.saved'))
         })
       }, [editing, onError, t])
+
+      const againRecord = useCallback((record) => {
+        setBusy(true)
+        setError('')
+        setRecordMsg('')
+        rpc('session/create', { fromSessionId: record.id }).then((result) => {
+          setBusy(false)
+          if (!result.ok) return onError(result)
+          setSession({ sessionId: result.value.sessionId, plan: result.value.plan, status: 'active', title: record.title })
+          setIndex(0)
+          setCard(null)
+          setCases([])
+          setProbe('')
+          setAnswer('')
+          setCodeText('')
+          setExportPath('')
+          setStartedAt(Date.now())
+          setPhase('run')
+          setRecordMsg(t('records.again.msg'))
+        })
+      }, [onError, t])
+
+      const toggleArchive = useCallback((record) => {
+        const archived = record.tags.includes(ARCHIVED_TAG)
+        setBusy(true)
+        setError('')
+        rpc('session/update', { sessionId: record.id, archived: !archived }).then((result) => {
+          setBusy(false)
+          if (!result.ok) return onError(result)
+          loadRecords()
+        })
+      }, [loadRecords, onError])
+
+      const exportAll = useCallback(() => {
+        setBusy(true)
+        setError('')
+        setRecordMsg('')
+        const body = { dir: exportDir }
+        if (recordArchived === 'only') body.archived = true
+        rpc('history/export', body).then((result) => {
+          setBusy(false)
+          if (!result.ok) return onError(result)
+          setRecordMsg(t('records.exported').replace('{path}', result.value.path ?? ''))
+        })
+      }, [exportDir, recordArchived, onError, t])
 
       const removeOne = useCallback((record) => {
         const ask = typeof window !== 'undefined' && typeof window.confirm === 'function'
@@ -1221,6 +1286,20 @@ window.__ModuleLoader__.load({
                   loadRecords({ status: value })
                 },
               }),
+              h(Choice, {
+                label: t('records.archive'),
+                value: recordArchived,
+                options: [
+                  { value: 'exclude', label: t('records.status.all') },
+                  { value: 'only', label: t('records.archived.only') },
+                ],
+                onChange: (value) => {
+                  setRecordArchived(value)
+                  loadRecords({ archived: value })
+                },
+              }),
+              h('button', { type: 'button', style: busy ? styles.primaryOff : styles.primary, onClick: exportAll, disabled: busy },
+                t('records.exportAll')),
               h('button', { type: 'button', style: busy ? styles.primaryOff : styles.primary, onClick: () => loadRecords(), disabled: busy },
                 t('records.search')),
             ),
@@ -1259,7 +1338,11 @@ window.__ModuleLoader__.load({
                           `${record.mode} · ${record.difficulty} · ${t('records.turns').replace('{n}', String(record.turns))}`),
                         h('span', { style: record.overall === null ? styles.meta : styles.badge },
                           record.overall === null ? '–' : `${t('records.score')} ${record.overall}`),
-                        record.tags.length > 0 ? h('span', { style: styles.meta }, record.tags.join(' / ')) : null,
+                        record.tags.length > 0
+                          ? h('span', { style: styles.meta },
+                              record.tags.filter((tag) => tag !== ARCHIVED_TAG).join(' / ') || t('records.archive'))
+                          : null,
+                        record.tags.includes(ARCHIVED_TAG) ? h('span', { style: styles.badge }, t('records.archive')) : null,
                       ),
                       h('div', { style: { ...styles.row, marginTop: '8px' } },
                         record.status === 'finished'
@@ -1273,6 +1356,9 @@ window.__ModuleLoader__.load({
                           style: styles.button,
                           onClick: () => setEditing({ id: record.id, title: record.title, tagsText: record.tags.join('，'), note: '' }),
                         }, t('records.rename')),
+                        h('button', { type: 'button', style: styles.button, onClick: () => againRecord(record) }, t('records.again')),
+                        h('button', { type: 'button', style: styles.button, onClick: () => toggleArchive(record) },
+                          record.tags.includes(ARCHIVED_TAG) ? t('records.unarchive') : t('records.archive')),
                         h('button', { type: 'button', style: styles.button, onClick: () => exportReport('md', record.id) }, t('records.exportMd')),
                         h('button', { type: 'button', style: styles.button, onClick: () => exportReport('json', record.id) }, t('records.exportJson')),
                         h('button', { type: 'button', style: styles.button, onClick: () => removeOne(record) }, t('records.delete')),

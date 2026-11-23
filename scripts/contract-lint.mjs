@@ -168,6 +168,16 @@ for (const key of usedKeys) {
   else if (count < 2) note(errors, `i18n: dictionary key "${key}" is missing from one locale (found ${count}, need zh + en)`)
 }
 
+// D2: every op the panel posts must exist in ACTIONS. A typo here is invisible
+// at runtime (the host answers E_UNKNOWN_ACTION), so pin it at build time.
+const postedOps = new Set([...clientSource.matchAll(/\brpc\('([^']+)'/g)].map((match) => match[1]))
+const unknownOps = [...postedOps].filter((op) => !ACTIONS.includes(op))
+if (unknownOps.length > 0) {
+  note(errors, `contract: client.js posts unknown op(s) ${unknownOps.join(', ')}`)
+} else {
+  note(passed, `contract: all ${postedOps.size} client op(s) exist in ACTIONS`)
+}
+
 /* report ------------------------------------------------------------------ */
 
 for (const line of passed) console.log(`ok   ${line}`)

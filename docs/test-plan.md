@@ -296,6 +296,22 @@ S2 收口时分支覆盖率只有 **77.78%**（`director.mjs` 50%、`scorer.mjs`
 | TC-ASR-015 | I | 部分更新 | 只改 baseUrl/model 时沿用已存 Key，且后续转写真的用了新地址 | tmpdir + fetch |
 | TC-UX-012 | E | setup 首屏渲染 | 出现 `asr.*` 设置区与三个字段、保存按钮 | vm 渲染桩 |
 
+### D2 记录复用与归档（v0.4）
+
+| ID | 层级 | 场景 | 期望 | 夹具 |
+| --- | --- | --- | --- | --- |
+| TC-HIS-201 | U | 归档是系统标签 | `isArchived`/`withArchivedFlag` 幂等，取消归档只摘这一个标签 | 纯函数 |
+| TC-HIS-202 | U | `archived` 过滤三态 | 默认不含归档；`include` 全给；`only` 只给归档；非法值 `E_BAD_REQUEST` | 纯函数 |
+| TC-HIS-203 | U | 归档记录的可搜索性 | 默认搜不到，`include` 才搜得到 | 纯函数 |
+| TC-HIS-204 | U | `pickPatch` 接受 `archived` | 布尔通过；非布尔拒绝；空 patch 仍拒绝 | 纯函数 |
+| TC-HIS-205 | U | 标签筛选与归档过滤共存 | 默认视图点「已归档」标签无结果，`only` 下有 | 纯函数 |
+| TC-HIS-210 | I | `session/create` 带 `fromSessionId` | 继承画像与设置、`turns` 清空、新 id、标签清空 | tmpdir |
+| TC-HIS-211 | I | 再面一次的题单 | 题量相同、重复题 ≤ 一半、最后一题仍是手撕 | tmpdir |
+| TC-HIS-212 | I | 覆盖与失败 | 显式 `minutes`/`difficulty` 优先；未知 id → `E_SESSION_NOT_FOUND`；空串 → `E_BAD_REQUEST` | tmpdir |
+| TC-HIS-220 | I | `history/export` | 生成可解析 JSON，`count` 正确，含 `plan.items` | tmpdir |
+| TC-HIS-221 | I | 归档与整包导出 | 默认不带归档；`archived:true` 才带 | tmpdir |
+| TC-HIS-222 | I | 归档的可见性副作用 | 列表默认消失、`stats.total` 减少、`only` 可见且带标签、取消归档后回来 | tmpdir |
+
 ## 5. 执行与判定
 
 ```bash
