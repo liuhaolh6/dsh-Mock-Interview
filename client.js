@@ -381,12 +381,12 @@ window.__ModuleLoader__.load({
       },
       prompt: { fontSize: '15px', lineHeight: 1.7, margin: '0 0 12px', whiteSpace: 'pre-wrap' },
       badge: { fontSize: '11px', padding: '2px 8px', borderRadius: '999px', border: '1px solid currentColor', opacity: 0.7 },
-      ok: { fontSize: '12px', color: '#0f9d58' },
-      bad: { fontSize: '12px', color: '#d93a3f' },
+      ok: { fontSize: '12px', color: 'var(--mi-ok, #0b6b3a)' },
+      bad: { fontSize: '12px', color: 'var(--mi-bad, #b3261e)' },
       meta: { fontSize: '11px', opacity: 0.55 },
       dimRow: { display: 'grid', gridTemplateColumns: '84px 1fr 34px', alignItems: 'center', gap: '8px', fontSize: '12px' },
       bar: { height: '6px', borderRadius: '999px', background: 'rgba(127,127,127,0.2)', overflow: 'hidden' },
-      barFill: { height: '100%', background: '#2f6fed' },
+      barFill: { height: '100%', background: 'var(--mi-bar, #2f6fed)' },
       list: { margin: 0, paddingLeft: '18px', fontSize: '13px', lineHeight: 1.9, opacity: 0.88 },
     }
 
@@ -592,6 +592,7 @@ window.__ModuleLoader__.load({
       const [records, setRecords] = useState([])
       const [recordsTotal, setRecordsTotal] = useState(0)
       const [recordsEmpty, setRecordsEmpty] = useState(null)
+      const [theme, setTheme] = useState(null)
       const [recordsStats, setRecordsStats] = useState(null)
       const [recordsTrend, setRecordsTrend] = useState([])
       // Ticking clock for "how long have I been in this interview"; the host
@@ -652,6 +653,22 @@ window.__ModuleLoader__.load({
         setProbe('')
         setReport(null)
         setExportPath('')
+      }, [])
+
+      // Ask the host which palette to use. The scheme comes from the host's own
+      // theme service; an unknown or missing service falls back to light.
+      useEffect(() => {
+        let scheme = 'light'
+        try {
+          const service = props.ctx?.get?.('theme')
+          const snapshot = typeof service?.getTheme === 'function' ? service.getTheme() : null
+          if (snapshot?.active?.colorScheme === 'dark') scheme = 'dark'
+        } catch (error) {
+          scheme = 'light'
+        }
+        rpc('ping', { scheme }).then((result) => {
+          if (result.ok && result.value?.theme) setTheme(result.value.theme)
+        })
       }, [])
 
       const onError = useCallback((failure) => {
@@ -886,9 +903,7 @@ window.__ModuleLoader__.load({
           { value: 'active', label: t('records.status.active') },
           { value: 'finished', label: t('records.status.finished') },
         ]
-        return h(
-          'div',
-          { style: styles.page },
+        return page(
           h('div', { style: styles.head },
             h('h1', { style: styles.title }, t('records.title')),
             h('span', { style: styles.badge }, t('records.count').replace('{total}', String(recordsTotal))),
@@ -911,7 +926,11 @@ window.__ModuleLoader__.load({
                     style: {
                       width: '18px',
                       height: Math.max(6, Math.round(point.overall * 14)) + 'px',
-                      background: point.overall >= 3.5 ? '#2f6fed' : point.overall >= 2.5 ? '#f0a020' : '#d93a3f',
+                      background: point.overall >= 3.5
+                        ? 'var(--mi-bar, #2f6fed)'
+                        : point.overall >= 2.5
+                          ? 'var(--mi-warn, #8a4b00)'
+                          : 'var(--mi-bad, #b3261e)',
                       borderRadius: '3px',
                     },
                   })),
@@ -1035,9 +1054,7 @@ window.__ModuleLoader__.load({
       }
 
       if (phase === 'setup') {
-        return h(
-          'div',
-          { style: styles.page },
+        return page(
           h('div', { style: styles.head },
             h('h1', { style: styles.title }, t('panel.title')),
             h('span', { style: styles.badge }, setup.mode),
@@ -1093,12 +1110,22 @@ window.__ModuleLoader__.load({
         )
       }
 
+      // The palette arrives from the host (see the `ping` action) so the two
+      // colour schemes stay in one place, tested for contrast in lib/theme.mjs.
+      const themeVars = theme === null
+        ? {}
+        : {
+            '--mi-ok': theme.ok,
+            '--mi-bad': theme.bad,
+            '--mi-warn': theme.warn,
+            '--mi-bar': theme.bar,
+          }
+      const page = (...children) => h('div', { style: { ...styles.page, ...themeVars } }, ...children)
+
       const canStart = skillsText.trim() !== '' || projectsText.trim() !== ''
 
       if (phase === 'confirm') {
-        return h(
-          'div',
-          { style: styles.page },
+        return page(
           h('div', { style: styles.head }, h('h1', { style: styles.title }, t('confirm.title'))),
           h('div', { style: styles.card },
             h(Field, { label: t('confirm.skills') },
@@ -1136,9 +1163,7 @@ window.__ModuleLoader__.load({
       }
 
       if (phase === 'report') {
-        return h(
-          'div',
-          { style: styles.page },
+        return page(
           h(ReportPanel, {
             t,
             report,
@@ -1157,9 +1182,7 @@ window.__ModuleLoader__.load({
       }
 
       const last = index >= total - 1
-      return h(
-        'div',
-        { style: styles.page },
+      return page(
         h('div', { style: styles.head },
           h('h1', { style: styles.title }, t('panel.title')),
           h('span', { style: styles.badge }, t(`run.kind.${item?.kind ?? 'skill'}`)),

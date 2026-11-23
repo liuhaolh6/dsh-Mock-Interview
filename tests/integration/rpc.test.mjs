@@ -25,7 +25,16 @@ async function call(body, deps) {
 test('TC-RPC-001 ping answers with a pong envelope', async () => {
   const payload = await call({ op: 'ping' }, { now: () => 1234 })
   assert.equal(payload.ok, true)
-  assert.deepEqual(payload.value, { pong: true, version: VERSION, schemaVersion: 2, at: 1234 })
+  assert.deepEqual(payload.value, {
+    pong: true,
+    version: VERSION,
+    schemaVersion: 2,
+    at: 1234,
+    theme: payload.value.theme,
+  })
+  // v0.3 C6: the palette travels with the handshake (see TC-THM-010).
+  assert.equal(payload.value.theme.scheme, 'light')
+  assert.match(payload.value.theme.bg, /^#[0-9a-f]{6}$/)
 })
 
 test('TC-RPC-002 unknown op is rejected with E_UNKNOWN_ACTION', async () => {

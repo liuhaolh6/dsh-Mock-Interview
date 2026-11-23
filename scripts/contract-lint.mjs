@@ -141,6 +141,20 @@ if (/options:\s*\[\s*'/.test(clientSource)) {
   note(passed, 'ui: every Choice receives { value, label } options')
 }
 
+// Semantic colours must come from the palette the host sends (lib/theme.mjs).
+// These two hex values were the pre-C6 greens/reds that failed WCAG on a light
+// background; seeing them again means someone bypassed the palette.
+for (const legacy of ['#0f9d58', '#d93a3f']) {
+  if (clientSource.includes(legacy)) {
+    note(errors, `ui: client.js hardcodes ${legacy}; use the palette custom properties (--mi-*)`)
+  }
+}
+if (!clientSource.includes('var(--mi-')) {
+  note(errors, 'ui: client.js does not read the --mi-* palette variables')
+} else {
+  note(passed, 'ui: no legacy low-contrast colours, palette variables in use')
+}
+
 // Every t('key') must exist in both the zh and en dictionaries; a missing key
 // silently renders an empty label.
 const dictKeys = new Map()

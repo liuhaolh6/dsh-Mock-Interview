@@ -355,6 +355,27 @@ note: string         // 复盘备注，只在 session/get 里返回全文
 - `profile/extract` 的响应多一个 `readiness`：`{ ready, blockers }`，`blockers` ⊆ `['skills','projects']`。技能与项目都空时 `ready:false`；只有一个也算可开始（题目会退到题库）。
 - 确认页的主按钮以`用户将要提交的那两个输入框`为准（`skillsText`/`projectsText` 任一非空）。宿主给的 `readiness` 只用于解释「哪里还薄」，不覆盖用户的编辑。
 
+### 3.1.1 配色由宿主下发（v0.3 C6）
+
+`ping` 的响应多一个 `theme`（请求可带 `scheme: 'light' | 'dark'`，缺省为 `light`，未知值按 light 处理）：
+
+```json
+{
+  "pong": true, "version": "0.4.0", "schemaVersion": 2, "at": 0,
+  "theme": {
+    "scheme": "dark", "bg": "#12161b", "surface": "#1b2027",
+    "text": "#e6edf3", "muted": "#9aa4b2", "border": "#3d444d",
+    "primary": "#2f6fed", "primaryText": "#ffffff",
+    "ok": "#57d08a", "bad": "#ff8f88", "warn": "#e3b341", "bar": "#2f6fed"
+  }
+}
+```
+
+- 面板不允许写死语义色：它把配色灌成 `--mi-*` 自定义属性，样式表只读 `var(--mi-ok, …)`。
+- 两套配色的对比度由 `lib/theme.mjs` 的 `contrastRatio` 在 `TC-THM-001..003` 里断言（文本对 ≥ 4.5:1，边框 1.4–4.5:1）。
+- `TC-THM-011` 守住「下发给面板的就是被测试过的那份」：中途改色会导致测试红。
+- `scripts/contract-lint.mjs` 另外禁止 `#0f9d58` / `#d93a3f` 这两个在浅色底上不达标的旧值回到 `client.js`。
+
 ## 4. 错误码全表
 
 | code | 触发 | 可重试 | 前端表现 |

@@ -26,6 +26,7 @@ import { buildReport, exportReport } from './lib/report.mjs'
 import { defaultTitle, listSessions, pickPatch, sessionMeta } from './lib/history.mjs'
 import { progressOf, statsOf, trendOf } from './lib/insights.mjs'
 import { emptyReasonFor, readinessOf } from './lib/onboarding.mjs'
+import { pickTheme } from './lib/theme.mjs'
 import { buildPlan } from './lib/session.mjs'
 import { scoreAnswer } from './lib/scorer.mjs'
 import { createStore } from './lib/store.mjs'
@@ -111,7 +112,15 @@ export async function dispatch(request, deps = {}) {
   try {
     switch (op) {
       case 'ping':
-        return ok({ pong: true, version: VERSION, schemaVersion: SCHEMA_VERSION, at: now() })
+        // The panel asks which palette to paint itself with; contrast is
+        // checked in lib/theme.mjs (TC-THM-001..003) rather than by eye.
+        return ok({
+          pong: true,
+          version: VERSION,
+          schemaVersion: SCHEMA_VERSION,
+          at: now(),
+          theme: pickTheme(body.scheme),
+        })
 
       case 'profile/extract': {
         const { profile, warnings } = await extractProfile(
