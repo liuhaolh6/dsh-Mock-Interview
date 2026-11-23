@@ -476,3 +476,13 @@ ACTIONS 十项全部有实现；UI 侧不重复计算分数，只渲染宿主给
 
 > 面板侧用 CSS 自定义属性 `--mi-*` 承接配色，`contract-lint` 禁止旧的低对比色值回流。
 
+### C7 报告折叠与复制（v0.3）
+
+| ID | 层级 | 场景 | 断言 |
+|---|---|---|---|
+| TC-REP-012 | I | `report/preview` | 返回 Markdown（含标题与六维表）、目录无 .md、会话仍 active |
+| TC-REP-013 | I | 未知会话 | `E_SESSION_NOT_FOUND` |
+| TC-UX-006 | E | 折叠 | 每题一个 `<details>/<summary>`（原生键盘可达） |
+| TC-UX-007 | E | 复制 | 走 `report/preview` + `navigator.clipboard`，有成功/失败两条文案 |
+| TC-UX-008 | E | 忙碌态 | 复制按钮 `disabled: props.busy` |
+

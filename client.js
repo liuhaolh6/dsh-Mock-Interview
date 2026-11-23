@@ -121,6 +121,13 @@ window.__ModuleLoader__.load({
         'confirm.blocked': '至少填一项技能或一个项目，否则没法出题。',
         'confirm.readiness.ready': '画像完整，可以直接开始。',
         'run.submit.hint': 'Ctrl / ⌘ + Enter 提交',
+        'report.items': '逐题回顾',
+        'report.reference': '参考解',
+        'report.cases': '边界用例（未真实执行）',
+        'report.copyMarkdown': '复制 Markdown',
+        'report.copyQuestion': '复制本题',
+        'report.copied': '已复制到剪贴板',
+        'report.copyFailed': '复制失败：浏览器拒绝了剪贴板权限',
         'records.title': '面试记录',
         'records.search': '搜索标题 / 标签 / 备注',
         'records.ph': '例如 Redis、订单中心',
@@ -184,6 +191,13 @@ window.__ModuleLoader__.load({
         'confirm.blocked': 'Add at least one skill or one project, otherwise there is nothing to ask about.',
         'confirm.readiness.ready': 'Profile looks complete — ready to start.',
         'run.submit.hint': 'Ctrl / ⌘ + Enter submits',
+        'report.items': 'Per-question review',
+        'report.reference': 'Reference answer',
+        'report.cases': 'Edge cases (never executed)',
+        'report.copyMarkdown': 'Copy Markdown',
+        'report.copyQuestion': 'Copy question',
+        'report.copied': 'Copied to clipboard',
+        'report.copyFailed': 'Copy failed: the browser denied clipboard access',
         'records.title': 'Interview records',
         'records.search': 'Search title / tags / note',
         'records.ph': 'e.g. Redis, order service',
@@ -381,6 +395,9 @@ window.__ModuleLoader__.load({
       },
       prompt: { fontSize: '15px', lineHeight: 1.7, margin: '0 0 12px', whiteSpace: 'pre-wrap' },
       badge: { fontSize: '11px', padding: '2px 8px', borderRadius: '999px', border: '1px solid currentColor', opacity: 0.7 },
+      detail: { border: '1px solid currentColor', borderOpacity: 0.2, borderRadius: '8px', padding: '8px 10px', marginTop: '8px' },
+      summary: { cursor: 'pointer', fontWeight: 600 },
+      pre: { whiteSpace: 'pre-wrap', fontSize: '12px', margin: '8px 0', padding: '8px', borderRadius: '6px', background: 'rgba(127, 127, 127, 0.12)' },
       ok: { fontSize: '12px', color: 'var(--mi-ok, #0b6b3a)' },
       bad: { fontSize: '12px', color: 'var(--mi-bad, #b3261e)' },
       meta: { fontSize: '11px', opacity: 0.55 },
@@ -510,6 +527,7 @@ window.__ModuleLoader__.load({
     function ReportPanel(props) {
       const t = props.t
       const report = props.report
+      const items = report?.items ?? []
       const dims = report?.radar?.dims ?? report?.dims ?? {}
       const weak = report?.weakTop3 ?? (report?.weaknesses ?? []).map((entry) => entry.dimension)
       const actions = report?.actions ?? []
@@ -543,6 +561,35 @@ window.__ModuleLoader__.load({
               ),
             )
           : null,
+        // v0.3 C7: long reports are folded by question; `details` is keyboard
+        // reachable for free, so nobody needs to guess a custom accordion.
+        items.length > 0
+          ? h('div', { style: { marginTop: '18px' } },
+              h('div', { style: styles.cardTitle }, t('report.items')),
+              items.map((entry, index) =>
+                h('details', { key: entry.questionId ?? index, style: styles.detail },
+                  h('summary', { style: styles.summary },
+                    `${index + 1}. ${entry.topic ?? entry.questionId ?? ''}`,
+                    entry.overall === null || entry.overall === undefined ? '' : `  ·  ${entry.overall.toFixed(1)}`),
+                  entry.answer ? h('pre', { style: styles.pre }, entry.answer) : null,
+                  Array.isArray(entry.reference) && entry.reference.length > 0
+                    ? h('div', null,
+                        h('div', { style: styles.label }, t('report.reference')),
+                        h('ul', { style: styles.list }, entry.reference.map((line, i) => h('li', { key: i }, line))))
+                    : null,
+                  entry.cases && entry.cases.length > 0
+                    ? h('div', { style: { marginTop: '8px' } },
+                        h('div', { style: styles.label }, t('report.cases')),
+                        entry.cases.map((testCase, i) =>
+                          h('div', { key: i, style: styles.meta },
+                            `${testCase.ok ? '✓' : '✗'} ${testCase.input ?? ''} → ${testCase.expected ?? ''}`)))
+                    : null,
+                  h('button', {
+                    type: 'button',
+                    style: styles.button,
+                    onClick: () => props.onCopyQuestion(entry),
+                  }, t('report.copyQuestion') || '复制本题'))))
+          : null,
         h(Field, { label: t('report.dir') },
           h('input', {
             style: styles.input,
@@ -561,6 +608,14 @@ window.__ModuleLoader__.load({
             onChange: props.onFormatChange,
           }),
           h('button', { type: 'button', style: props.busy ? styles.primaryOff : styles.primary, onClick: () => props.onExport(props.exportFormat), disabled: props.busy }, t('report.export')),
+          h('button', {
+            type: 'button',
+            style: styles.button,
+            onClick: props.onCopyMarkdown,
+            disabled: props.busy,
+            onFocus: ringOn,
+            onBlur: ringOff,
+          }, t('report.copyMarkdown')),
           h('button', { type: 'button', style: styles.button, onClick: props.onRestart }, t('report.again')),
           props.exportPath !== '' ? h('span', { style: styles.ok }, `${t('report.exported')}${props.exportPath}`) : null,
         ),
@@ -796,6 +851,40 @@ window.__ModuleLoader__.load({
           setSelected([])
         })
       }, [recordQuery, recordStatus, onError])
+
+      const copyText = useCallback((text2, key) => {
+        // Clipboard is best-effort: a denied permission must not break the view.
+        const done = () => setRecordMsg(t(key))
+        try {
+          const clipboard = globalThis.navigator?.clipboard
+          if (clipboard && typeof clipboard.writeText === 'function') {
+            clipboard.writeText(text2).then(done, () => setRecordMsg(t('report.copyFailed')))
+            return
+          }
+        } catch (error) {
+          /* fall through to the failure message */
+        }
+        setRecordMsg(t('report.copyFailed'))
+      }, [t])
+
+      const copyReport = useCallback(() => {
+        if (session === null) return
+        setBusy(true)
+        rpc('report/preview', { sessionId: session.id }).then((result) => {
+          setBusy(false)
+          if (!result.ok) return onError(result)
+          copyText(result.value.markdown ?? '', 'report.copied')
+        })
+      }, [session, copyText, onError, t])
+
+      const copyQuestion = useCallback((entry) => {
+        const lines = [
+          `### ${entry.topic ?? entry.questionId ?? ''}`,
+          entry.answer === '' || entry.answer === undefined ? '' : entry.answer,
+          ...(Array.isArray(entry.reference) ? ['', '参考解：', ...entry.reference] : []),
+        ]
+        copyText(lines.filter((line) => line !== null).join('\n'), 'report.copied')
+      }, [copyText, t])
 
       const openRecords = useCallback(() => {
         setPhase('records')
@@ -1175,6 +1264,8 @@ window.__ModuleLoader__.load({
             onFormatChange: setExportFormat,
             onDirChange: setExportDir,
             onExport: () => exportReport(exportFormat),
+            onCopyMarkdown: copyReport,
+            onCopyQuestion: copyQuestion,
             onRestart: reset,
           }),
           error !== '' ? h('div', { style: styles.bad }, error) : null,

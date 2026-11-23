@@ -376,6 +376,17 @@ note: string         // 复盘备注，只在 session/get 里返回全文
 - `TC-THM-011` 守住「下发给面板的就是被测试过的那份」：中途改色会导致测试红。
 - `scripts/contract-lint.mjs` 另外禁止 `#0f9d58` / `#d93a3f` 这两个在浅色底上不达标的旧值回到 `client.js`。
 
+### 3.14 report/preview（v0.3 C7）
+
+请求：`{ "op": "report/preview", "sessionId": "<id>" }`
+
+响应：`{ "markdown": "<与导出完全一致的 Markdown>" }`
+
+- 与 `report/export` **共用** `buildReport` + `renderMarkdown`，因此复制出去的内容和导出的文件一字不差。
+- 只读：不写文件、不改 `status`、不落盘任何临时文件（`TC-REP-012` 断言目录里没有 .md、会话仍是 `active`）。
+- 会话不存在 → `E_SESSION_NOT_FOUND`（`TC-REP-013`）。
+- 未结束的会话也能预览，用于「先看分再决定要不要收尾」。
+
 ## 4. 错误码全表
 
 | code | 触发 | 可重试 | 前端表现 |

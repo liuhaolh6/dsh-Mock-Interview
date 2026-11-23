@@ -22,7 +22,7 @@ import { reviewCode } from './lib/code-review.mjs'
 import { decideProbe } from './lib/director.mjs'
 import { ContractError, isContractError } from './lib/errors.mjs'
 import { extractProfile } from './lib/profile.mjs'
-import { buildReport, exportReport } from './lib/report.mjs'
+import { buildReport, exportReport, renderMarkdown } from './lib/report.mjs'
 import { defaultTitle, listSessions, pickPatch, sessionMeta } from './lib/history.mjs'
 import { progressOf, statsOf, trendOf } from './lib/insights.mjs'
 import { emptyReasonFor, readinessOf } from './lib/onboarding.mjs'
@@ -280,6 +280,14 @@ export async function dispatch(request, deps = {}) {
         session.updatedAt = now()
         await store.put(session)
         return ok({ report })
+      }
+
+      case 'report/preview': {
+        // Same Markdown the exporter writes, minus the file: the report screen
+        // offers "copy" and users should not have to create artifacts to paste.
+        const session = await resolveStore(deps).get(body.sessionId)
+        const report = session.report ?? buildReport(session)
+        return ok({ markdown: renderMarkdown(report) })
       }
 
       case 'report/export': {
