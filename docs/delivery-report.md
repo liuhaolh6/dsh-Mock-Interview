@@ -6,6 +6,25 @@
 - 交付日期：2026-11-23
 - 承诺范围：章程 §2 的 6 项 In scope；7 项 Out of scope 明确未做（见 §4）
 
+## 0. v0.2.0（2026-11-23，功能补齐）
+
+v0.1.0 交付后负责人过了一遍流程，结论是「功能完成度还行，但很粗糙」，于是 v0.2 先补功能、v0.3 再做体验打磨。四批按依赖顺序全部完成：
+
+| 批次 | 内容 | 提交 | 用例 |
+| --- | --- | --- | --- |
+| B1 | 面试记录增删改查：改名/标签/备注、搜索、状态与模式筛选、排序分页、批量删除、从历史续考 | `5a90be7`、`1fa0e88` | TC-HIS-001..007、TC-HIS-100..105 |
+| B2 | `schemaVersion` 1→2 视图迁移、写前一次性 `.v1.bak`、列表索引缓存（mtime 命中） | `7bc91da` | TC-MIG-001..005、TC-IDX-001..005 |
+| B3 | 题库外置到 `data/bank.json`、按岗位关键词排序、连续两次空答跳题 | `2a2067b` | TC-BNK-001..006、TC-DIR-006、TC-BNK-101..102 |
+| B4 | `report/export` 支持 `format: md|json`、报告含逐题原文与参考解、列表直接导出 | `95b24a2` | TC-REP-007、TC-REP-009..011 |
+
+收口证据：`npm test` **155/155**、`npm run e2e` 6/6、`npm run lint` 0 error / 0 warning（44 文件）、coverage 行 **98.09%** / 分支 **86.71%** / 函数 96.45%。
+
+v0.2 明确没做（留给 v0.3 或更远）：
+
+- 体验打磨：空态引导、进度感、错误人话化、键盘操作、统计趋势、主题跟随、报告折叠；
+- 语音作答仍依赖自备 ASR 端点；手撕代码仍是静态评审（不执行、不跑测试）；
+- 题库目前只有 20 道内置题，没有按公司/岗位定制题库的管理界面。
+
 ## 1. 交付物
 
 | 类别 | 文件 | 说明 |
@@ -21,7 +40,7 @@
 | | `lib/store.mjs` | 会话 JSON 持久化（原子写、2 MB 写前拦截、schema 迁移） |
 | | `lib/json.mjs` / `lib/errors.mjs` / `lib/contracts.js` | 围栏解析、错误类型、契约常量 |
 | 契约 | `docs/contracts.md` | 6 个数据结构 + 10 个动作 + 13 个错误码 + 8 问核对 + 2 MB 依据 |
-| 测试 | `tests/unit`（12 文件）/ `tests/integration`（8 文件）/ `tests/e2e`（1 文件） | 119 + 6 条用例 |
+| 测试 | `tests/unit`（13 文件）/ `tests/integration`（10 文件）/ `tests/e2e`（1 文件） | 155 + 6 条用例 |
 | 文档 | `docs/requirements/RC-001-mock-interview.md`、`docs/adr/0001..0005`、`docs/test-plan.md`、`docs/acceptance.md` | 需求卡、5 份 ADR、用例表、人工验收清单 |
 | 工程 | `package.json`、`cordis.patch.yml`、`icon.svg`、`scripts/contract-lint.mjs`、`AGENTS.md`、`README.md` | 装配与自带 lint |
 

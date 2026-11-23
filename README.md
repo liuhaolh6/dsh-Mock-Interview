@@ -2,7 +2,7 @@
 
 DeepSeek Harness 插件：**模拟技术面试官**。把简历和目标岗位喂进去，它会按真实面试的节奏连问你——八股、简历项目深挖、手撕代码、行为面——支持文字和语音作答，每题给分并指出「哪句答错、缺什么、怎么补」，最后导出一份可复盘的 Markdown 报告。
 
-> 当前状态：**v0.2 B4 — 报告与导出扩展**（B1 记录 CRUD、B2 存储迁移、B3 题库外置已完成）（v0.1.0 已交付并打点，见 [docs/delivery-report.md](docs/delivery-report.md)；人工验收见 [docs/acceptance.md](docs/acceptance.md)）。v0.2 排期见 [mock-interview-roadmap-v0.2.md](../../04-docs/mock-interview-roadmap-v0.2.md)。
+> 当前状态：**v0.2.0 — 功能补齐完成**（B1 记录 CRUD / B2 存储迁移 / B3 题库外置 / B4 报告导出）（v0.1.0 已交付并打点，见 [docs/delivery-report.md](docs/delivery-report.md)；人工验收见 [docs/acceptance.md](docs/acceptance.md)）。v0.2 排期见 [mock-interview-roadmap-v0.2.md](../../04-docs/mock-interview-roadmap-v0.2.md)。
 > 已实现：`lib/profile.mjs`（简历+JD → 画像）、`lib/session.mjs`（按时长定额、按本人技能/项目定靶）、
 > `lib/director.mjs`（按难度定措辞、结论式回答追问一次）、`lib/scorer.mjs`（六维评分 + 适用维度平均 + 越界钳制 + 无证据重试 + 空答 0 分）、
 > `lib/code-review.mjs`（手撕静态评审 + 5 条边界推演，恒 `executed:false`）、`lib/store.mjs`（原子写、2 MB 写前拦截、批量删除）、

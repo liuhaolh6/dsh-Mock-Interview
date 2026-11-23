@@ -30,7 +30,7 @@ import { createStore } from './lib/store.mjs'
 export const name = 'dsh-mock-interview'
 export const inject = []
 
-export const VERSION = '0.1.0'
+export const VERSION = '0.2.0'
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
