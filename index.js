@@ -24,6 +24,7 @@ import { ContractError, isContractError } from './lib/errors.mjs'
 import { extractProfile } from './lib/profile.mjs'
 import { buildReport, exportReport } from './lib/report.mjs'
 import { defaultTitle, listSessions, pickPatch, sessionMeta } from './lib/history.mjs'
+import { progressOf, statsOf, trendOf } from './lib/insights.mjs'
 import { buildPlan } from './lib/session.mjs'
 import { scoreAnswer } from './lib/scorer.mjs'
 import { createStore } from './lib/store.mjs'
@@ -193,24 +194,27 @@ export async function dispatch(request, deps = {}) {
 
       case 'session/get': {
         const session = await resolveStore(deps).get(body.sessionId)
-        return ok({ session })
+        // Progress is computed on the host so the panel and the tests agree on
+        // what "question 3 of 5" means (v0.3 C2).
+        return ok({ session, progress: progressOf(session, { now: now() }) })
       }
 
       case 'session/list': {
         const store = resolveStore(deps)
         const rows = await store.list()
-        return ok(
-          listSessions(rows, {
-            limit: body.limit,
-            offset: body.offset,
-            query: body.query,
-            status: body.status,
-            mode: body.mode,
-            difficulty: body.difficulty,
-            tag: body.tag,
-            sort: body.sort,
-          }),
-        )
+        const page = listSessions(rows, {
+          limit: body.limit,
+          offset: body.offset,
+          query: body.query,
+          status: body.status,
+          mode: body.mode,
+          difficulty: body.difficulty,
+          tag: body.tag,
+          sort: body.sort,
+        })
+        // Aggregates describe the whole filtered list, not just this page, so the
+        // stats strip does not jump when the user pages through records.
+        return ok({ ...page, stats: statsOf(rows), trend: trendOf(rows) })
       }
 
       case 'session/update': {

@@ -315,6 +315,38 @@ note: string         // 复盘备注，只在 session/get 里返回全文
 - `handle()` 的 500 兜底同样带 hint（`E_INTERNAL`），保证崩溃也不会露出裸错误码。
 - 未知码回退到通用文案，`code` 原样保留，方便用户反馈。
 
+### 3.12 进度与统计视图（v0.3 C2/C5）
+
+进度和统计**在宿主算**，客户端只渲染。理由：面板若自己按 `turns.length` 推算「第几题」，一旦出现同题覆盖写就会和报告对不上。
+
+`session/get` 的响应多一个 `progress`：
+
+```json
+{
+  "session": { "…": "…" },
+  "progress": {
+    "index": 2, "total": 5, "answered": 1, "remaining": 4,
+    "elapsedMs": 96000, "avgScore": 3.5, "finished": false
+  }
+}
+```
+
+`session/list` 的响应多两个聚合字段（描述**过滤后的全部记录**，不是当前页）：
+
+```json
+{
+  "sessions": [], "total": 0, "hasMore": false,
+  "stats": { "total": 3, "finished": 2, "active": 1, "avgScore": 3.5, "answeredTurns": 12 },
+  "trend": [{ "id": "…", "overall": 4, "createdAt": 1795365943704 }]
+}
+```
+
+- `index`：第一道未作答题的序号（1 起）；全部答完时等于 `total`。
+- `answered`：去重后的已答题目数（同题覆盖不算两次）。
+- `avgScore`：已评分题目的平均值，保留 1 位小数；没有评分时为 `null`（客户端显示 `–`）。
+- `trend`：最近 10 场有分数的会话，按时间**从旧到新**，供记录页的趋势条使用。
+- 这三个字段都是**只读派生值**，不落盘，不进 `Session` 结构。
+
 ## 4. 错误码全表
 
 | code | 触发 | 可重试 | 前端表现 |

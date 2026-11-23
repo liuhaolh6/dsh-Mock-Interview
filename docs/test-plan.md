@@ -420,3 +420,18 @@ ACTIONS 十项全部有实现；UI 侧不重复计算分数，只渲染宿主给
 | TC-MSG-011 | I | 畸形请求 | `E_BAD_REQUEST` 也给 hint |
 | TC-MSG-012 | I | 存储失败 | 保留自己的 code 且 retryable=true |
 | TC-MSG-013 | I | 500 兜底 | `E_INTERNAL` 带 hint，message 含原始异常 |
+
+### C2 进度感与 C5 记录统计（v0.3）
+
+| ID | 层级 | 场景 | 断言 |
+|---|---|---|---|
+| TC-INS-001 | U | 新会话 | index 1 / answered 0 / remaining = total / avgScore null |
+| TC-INS-002 | U | 答过两题 | index 3 / avgScore 3.5 / elapsedMs 由 now 决定 |
+| TC-INS-003 | U | 已结束 | remaining 0、finished true |
+| TC-INS-004 | U | 同题覆盖 | answered 只算 1、avgScore 取最新 |
+| TC-INS-005 | U | 列表统计 | total/finished/active/avgScore/answeredTurns |
+| TC-INS-006 | U | 趋势 | 取最近 n 场、忽略无分、按旧→新排序 |
+| TC-INS-007 | U | 空输入 | 不抛异常，返回零值 |
+| TC-INS-010 | I | `session/get` | 带 `progress`，total/index/elapsedMs 正确 |
+| TC-INS-011 | I | `session/list` | `stats` 与自身 rows 一致、`trend` 含刚作答的会话 |
+

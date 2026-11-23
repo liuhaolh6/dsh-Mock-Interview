@@ -18,7 +18,7 @@ window.__ModuleLoader__.load({
   factory(require) {
     const React = require('react')
     const h = React.createElement
-    const { useCallback, useState } = React
+    const { useCallback, useEffect, useState } = React
 
     const NS = 'dsh-mock-interview'
     const PANEL = 'mock-interview'
@@ -57,6 +57,9 @@ window.__ModuleLoader__.load({
         'confirm.start': '开始面试',
         'confirm.back': '返回修改',
         'run.progress': '第 {n} / {total} 题',
+        'run.elapsed': '用时',
+        'run.avg': '平均分',
+        'run.answered': '已答 {n} 题',
         'run.kind.skill': '八股',
         'run.kind.project': '项目',
         'run.kind.code': '手撕',
@@ -105,6 +108,8 @@ window.__ModuleLoader__.load({
         'records.status.active': '未完成',
         'records.status.finished': '已完成',
         'records.count': '共 {total} 条',
+        'records.stats': '共 {total} 场 · 已完成 {finished} · 进行中 {active} · 平均 {avg}',
+        'records.trend': '最近几场（左旧右新）',
         'records.continue': '继续',
         'records.view': '查看报告',
         'records.rename': '改名/标签',
@@ -159,6 +164,8 @@ window.__ModuleLoader__.load({
         'records.status.active': 'Unfinished',
         'records.status.finished': 'Finished',
         'records.count': '{total} records',
+        'records.stats': '{total} sessions · {finished} finished · {active} in progress · avg {avg}',
+        'records.trend': 'Recent sessions (oldest left)',
         'records.continue': 'Resume',
         'records.view': 'Open report',
         'records.rename': 'Rename / tag',
@@ -201,6 +208,9 @@ window.__ModuleLoader__.load({
         'run.answer': 'Your answer (as if a real interviewer were sitting across)',
         'run.submitting': 'Scoring…',
         'run.probing': 'Interviewer follow-up',
+        'run.elapsed': 'Elapsed',
+        'run.avg': 'Average',
+        'run.answered': '{n} answered',
       },
     }
 
@@ -551,6 +561,12 @@ window.__ModuleLoader__.load({
       const [exportFormat, setExportFormat] = useState('md')
       const [records, setRecords] = useState([])
       const [recordsTotal, setRecordsTotal] = useState(0)
+      const [recordsStats, setRecordsStats] = useState(null)
+      const [recordsTrend, setRecordsTrend] = useState([])
+      // Ticking clock for "how long have I been in this interview"; the host
+      // supplies the authoritative elapsed time when the session is loaded.
+      const [startedAt, setStartedAt] = useState(0)
+      const [, setTick] = useState(0)
       const [recordQuery, setRecordQuery] = useState('')
       const [recordStatus, setRecordStatus] = useState('')
       const [selected, setSelected] = useState([])
@@ -561,6 +577,32 @@ window.__ModuleLoader__.load({
       const item = items[index]
       const total = items.length
       const isCode = item?.kind === 'code'
+
+      // Sync the clock to the host's elapsed time on load, then let it tick.
+      const sessionId = session?.id ?? ''
+      useEffect(() => {
+        if (sessionId === '') return undefined
+        const elapsed = typeof session?.progress?.elapsedMs === 'number' ? session.progress.elapsedMs : 0
+        setStartedAt(Date.now() - elapsed)
+        const timer = setInterval(() => setTick((value) => value + 1), 1000)
+        return () => clearInterval(timer)
+      }, [sessionId])
+
+      const elapsedText = (() => {
+        if (startedAt === 0) return ''
+        const seconds = Math.max(Math.floor((Date.now() - startedAt) / 1000), 0)
+        const mm = String(Math.floor(seconds / 60)).padStart(2, '0')
+        const ss = String(seconds % 60).padStart(2, '0')
+        return mm + ':' + ss
+      })()
+
+      const answeredCount = Array.isArray(session?.turns) ? session.turns.length : 0
+      const runningAvg = (() => {
+        const scored = (session?.turns ?? []).filter((turn) => typeof turn?.score?.overall === 'number')
+        if (scored.length === 0) return null
+        const sum = scored.reduce((total2, turn) => total2 + turn.score.overall, 0)
+        return Math.round((sum / scored.length) * 10) / 10
+      })()
 
       const reset = useCallback(() => {
         setPhase('setup')
@@ -700,6 +742,8 @@ window.__ModuleLoader__.load({
           if (!result.ok) return onError(result)
           setRecords(result.value.sessions ?? [])
           setRecordsTotal(result.value.total ?? 0)
+          setRecordsStats(result.value.stats ?? null)
+          setRecordsTrend(result.value.trend ?? [])
           setSelected([])
         })
       }, [recordQuery, recordStatus, onError])
@@ -816,9 +860,31 @@ window.__ModuleLoader__.load({
           h('div', { style: styles.head },
             h('h1', { style: styles.title }, t('records.title')),
             h('span', { style: styles.badge }, t('records.count').replace('{total}', String(recordsTotal))),
+            recordsStats === null
+              ? null
+              : h('span', { style: styles.meta }, t('records.stats')
+                  .replace('{total}', String(recordsStats.total))
+                  .replace('{finished}', String(recordsStats.finished))
+                  .replace('{active}', String(recordsStats.active))
+                  .replace('{avg}', recordsStats.avgScore === null ? '–' : recordsStats.avgScore.toFixed(1))),
             h('button', { type: 'button', style: styles.button, onClick: () => setPhase('setup') }, t('records.back')),
           ),
           h('div', { style: styles.card },
+            recordsTrend.length === 0
+              ? null
+              : h('div', { style: { ...styles.row, alignItems: 'flex-end', gap: '6px', marginBottom: '12px' } },
+                  recordsTrend.map((point) => h('div', {
+                    key: point.id,
+                    title: point.id + ' · ' + point.overall.toFixed(1),
+                    style: {
+                      width: '18px',
+                      height: Math.max(6, Math.round(point.overall * 14)) + 'px',
+                      background: point.overall >= 3.5 ? '#2f6fed' : point.overall >= 2.5 ? '#f0a020' : '#d93a3f',
+                      borderRadius: '3px',
+                    },
+                  })),
+                  h('span', { style: styles.meta }, t('records.trend')),
+                ),
             h('div', { style: styles.row },
               h('input', {
                 style: { ...styles.input, flex: '1 1 220px' },
@@ -1040,6 +1106,9 @@ window.__ModuleLoader__.load({
           h('h1', { style: styles.title }, t('panel.title')),
           h('span', { style: styles.badge }, t(`run.kind.${item?.kind ?? 'skill'}`)),
           h('span', { style: styles.meta }, t('run.progress').replace('{n}', String(index + 1)).replace('{total}', String(total))),
+          elapsedText === '' ? null : h('span', { style: styles.meta }, t('run.elapsed') + ' ' + elapsedText),
+          runningAvg === null ? null : h('span', { style: styles.badge }, t('run.avg') + ' ' + runningAvg.toFixed(1)),
+          answeredCount === 0 ? null : h('span', { style: styles.meta }, t('run.answered').replace('{n}', String(answeredCount))),
         ),
         h('div', { style: styles.card },
           h('p', { style: styles.prompt }, item?.topic ?? item?.target ?? ''),
