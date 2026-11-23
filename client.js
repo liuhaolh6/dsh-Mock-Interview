@@ -18,6 +18,20 @@ window.__ModuleLoader__.load({
   factory(require) {
     const React = require('react')
     const h = React.createElement
+    // Keyboard helpers. An IME that is still composing owns the Enter key: if we
+    // act on it we submit half a Chinese sentence, which is worse than nothing.
+    const isComposing = (event) => event.isComposing === true || event.keyCode === 229
+    const isSubmitShortcut = (event) =>
+      event.key === 'Enter' && (event.metaKey === true || event.ctrlKey === true) && !isComposing(event)
+    // Visible focus for keyboard users: inline styles cannot express :focus-visible,
+    // so the ring is toggled on the element itself.
+    const ringOn = (event) => {
+      event.currentTarget.style.outline = '2px solid #2f6fed'
+      event.currentTarget.style.outlineOffset = '2px'
+    }
+    const ringOff = (event) => {
+      event.currentTarget.style.outline = 'none'
+    }
     const { useCallback, useEffect, useState } = React
 
     const NS = 'dsh-mock-interview'
@@ -106,6 +120,7 @@ window.__ModuleLoader__.load({
         'records.filtered.cta': '清空筛选',
         'confirm.blocked': '至少填一项技能或一个项目，否则没法出题。',
         'confirm.readiness.ready': '画像完整，可以直接开始。',
+        'run.submit.hint': 'Ctrl / ⌘ + Enter 提交',
         'records.title': '面试记录',
         'records.search': '搜索标题 / 标签 / 备注',
         'records.ph': '例如 Redis、订单中心',
@@ -168,6 +183,7 @@ window.__ModuleLoader__.load({
         'records.filtered.cta': 'Clear filters',
         'confirm.blocked': 'Add at least one skill or one project, otherwise there is nothing to ask about.',
         'confirm.readiness.ready': 'Profile looks complete — ready to start.',
+        'run.submit.hint': 'Ctrl / ⌘ + Enter submits',
         'records.title': 'Interview records',
         'records.search': 'Search title / tags / note',
         'records.ph': 'e.g. Redis, order service',
@@ -419,6 +435,8 @@ window.__ModuleLoader__.load({
               style: on ? styles.choiceOn : styles.choice,
               'aria-pressed': on ? 'true' : 'false',
               onClick: () => props.onChange(spec.value),
+              onFocus: ringOn,
+              onBlur: ringOff,
             },
             spec.label,
           )
@@ -906,6 +924,7 @@ window.__ModuleLoader__.load({
                 placeholder: t('records.ph'),
                 onChange: (event) => setRecordQuery(event.target.value),
                 onKeyDown: (event) => {
+                  if (isComposing(event)) return
                   if (event.key === 'Enter') loadRecords()
                 },
               }),
@@ -1169,17 +1188,43 @@ window.__ModuleLoader__.load({
               ? h('textarea', {
                   style: { ...styles.input, minHeight: '180px', fontFamily: 'ui-monospace, Consolas, monospace' },
                   value: codeText,
+                  'aria-label': t('run.code'),
                   onChange: (event) => setCodeText(event.target.value),
+                  onKeyDown: (event) => {
+                    if (isComposing(event)) return
+                    if (isSubmitShortcut(event)) {
+                      event.preventDefault()
+                      if (!busy) submit()
+                    }
+                  },
+                  onFocus: ringOn,
+                  onBlur: ringOff,
                   spellCheck: false,
                 })
               : h('textarea', {
                   style: { ...styles.input, minHeight: '120px' },
                   value: answer,
+                  'aria-label': t('run.answer'),
                   onChange: (event) => setAnswer(event.target.value),
+                  onKeyDown: (event) => {
+                    if (isComposing(event)) return
+                    if (isSubmitShortcut(event)) {
+                      event.preventDefault()
+                      if (!busy) submit()
+                    }
+                  },
+                  onFocus: ringOn,
+                  onBlur: ringOff,
                 })),
           h('div', { style: styles.row },
-            h('button', { type: 'button', style: busy ? styles.primaryOff : styles.primary, onClick: submit, disabled: busy },
-              busy ? t('run.submitting') : t('run.submit')),
+            h('button', {
+              type: 'button',
+              style: busy ? styles.primaryOff : styles.primary,
+              onClick: submit,
+              disabled: busy,
+              onFocus: ringOn,
+              onBlur: ringOff,
+            }, busy ? t('run.submitting') : t('run.submit')),
             last
               ? h('button', { type: 'button', style: styles.button, onClick: finish, disabled: busy }, t('run.finish'))
               : h('button', {

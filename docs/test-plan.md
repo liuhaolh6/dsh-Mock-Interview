@@ -450,3 +450,15 @@ ACTIONS 十项全部有实现；UI 侧不重复计算分数，只渲染宿主给
 
 > 诚实记录：`lib/onboarding.mjs` 的用例与实现是同一步写入并一起跑绿的，没留下失败快照；集成两条是「先跑红（`emptyReason` 为 undefined）→ 修夹具与接线 → 绿」。
 
+### C4 键盘可达性（v0.3）
+
+| ID | 层级 | 场景 | 断言 |
+|---|---|---|---|
+| TC-UX-001 | E | 输入法组合期按 Enter | 每个 keydown 处理器都先查 `isComposing` |
+| TC-UX-002 | E | Ctrl / ⌘ + Enter | 同一表达式里同时读 `metaKey` 与 `ctrlKey`，且 `key === 'Enter'` |
+| TC-UX-003 | E | 所有按钮 | 每个 `h('button'` 都声明 `type: 'button'`（否则回车会触发表单提交） |
+| TC-UX-004 | E | 键盘焦点 | 交互组件有 `onFocus` 与 `outline` 样式（内联样式无法写 `:focus-visible`） |
+| TC-UX-005 | E | 作答框 | textarea 带 `aria-label` 或可见 `label` |
+
+> 这一批是「源码级契约」：面板是单文件模块，没有 DOM 测试环境，所以用 e2e 层读 `client.js` 断言浏览器行为的前提条件。
+
