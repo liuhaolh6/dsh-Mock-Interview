@@ -96,6 +96,21 @@ node "D:/agent/DeepseekHarness/resources/runtime/primary-runtime/dependencies/pn
 
 **仍未人工验证**：在真机记录页把「再面一次 / 归档 / 导出全部历史」各点一遍。
 
+## v0.4 D3 手撕语言化评审验收（2026-11-23）
+
+| # | 验收项 | 证据 | 结论 |
+| --- | --- | --- | --- |
+| D3-1 | 六种语言各有自己的检查点，不是同一套泛泛而谈 | TC-COD-201（`LANGUAGES` 六项、每项 ≥3 条、两两集合不同） | ✅ |
+| D3-2 | 检查点真的进了 system prompt（Java 空引用/溢出、Go nil/defer、SQL NULL/索引/事务） | TC-COD-202 | ✅ |
+| D3-3 | 边界用例按该语言习惯构造（python 用 `None`、`c++` 指向越界与内存） | TC-COD-203 | ✅ |
+| D3-4 | 别名归一（`js`/`py`/`golang`/`cpp`/`C++11`/`mysql`…）与大小写无关 | TC-COD-204 | ✅ |
+| D3-5 | 未知语言不报错：回退通用检查点、`language==='generic'`、`warnings` 点名原语言 | TC-COD-204、TC-COD-206 | ✅ |
+| D3-6 | 语言进了评分证据首行，报告脱离会话也知道按什么标准评的 | TC-COD-205 | ✅ |
+| D3-7 | 面板语言胶囊的取值与宿主 `LANGUAGES` 逐项相等（标签显示 `Java`/`C++` 等，值仍是 canonical 串） | `scripts/contract-lint.mjs` 输出 `contract: 6 language(s) match between panel and reviewer` | ✅ |
+| D3-8 | 缺省语言（旧客户端不传 `language`）仍能评审 | TC-EDG-018（契约变更后断言 `language==='generic'`） | ✅ |
+
+**仍未人工验证**：在真机用 Java 与 Go 各提交一段代码，肉眼确认两次的边界用例列不是同一套。
+
 ## 未覆盖（诚实记录）
 
 - **完整 UI 全流程一次跑通**：第 6–10 步的 RPC 语义已用活体探针逐条验证，页面交互由用户点验到「选项可读 + 页面打开」；从录入到导出的连续点击尚未由人完整走完一轮。

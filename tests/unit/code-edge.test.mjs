@@ -91,13 +91,16 @@ test('TC-EDG-017 malformed case entries are normalised to strings and false', as
   assert.equal(result.cases.length, 5)
 })
 
-test('TC-EDG-018 extra cases are truncated to five and a missing language is labelled', async () => {
+test('TC-EDG-018 extra cases are truncated to five and a missing language falls back to the generic checklist', async () => {
   const parsed = JSON.parse(CODE_REVIEW_OK)
   parsed.cases = [...parsed.cases, { input: '9', expected: '9', actual: '9', ok: true }, { input: '8', expected: '8', actual: '8', ok: true }]
   const llm = fakeLlm({ replies: [JSON.stringify(parsed)] })
   const result = await reviewCode({ item: ITEM_CODE, code: 'x = 1', complete: llm.complete })
   assert.equal(result.cases.length, 5)
-  assert.ok(llm.calls[0].messages[0].content.includes('unknown'))
+  // v0.4 D3 契约变更：没给语言时不再塞一个 'unknown' 占位，而是改用通用检查点并
+  // 在结果里把实际使用的语言如实回传（language === 'generic'）。
+  assert.equal(result.language, 'generic')
+  assert.ok(llm.calls[0].messages[0].content.includes('通用'))
 })
 
 test('TC-EDG-019 one corrective retry rescues an unparseable review', async () => {

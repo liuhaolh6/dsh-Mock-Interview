@@ -178,6 +178,27 @@ if (unknownOps.length > 0) {
   note(passed, `contract: all ${postedOps.size} client op(s) exist in ACTIONS`)
 }
 
+// D3: the language pills in the panel and the review checklists on the host are
+// two separate lists. A drift here means the UI offers a language the reviewer
+// silently treats as generic, so pin them equal.
+function languagesOf(source, pattern) {
+  const match = source.match(pattern)
+  if (match === null) return null
+  return [...match[1].matchAll(/'([^']+)'/g)].map((item) => item[1])
+}
+const clientLanguages = languagesOf(clientSource, /const LANGUAGES = \[([^\]]+)\]/)
+const hostLanguages = languagesOf(readFileSync(join(ROOT, 'lib', 'code-review.mjs'), 'utf8'), /export const LANGUAGES = \[([^\]]+)\]/)
+if (clientLanguages === null || hostLanguages === null) {
+  note(errors, 'contract: LANGUAGES not found in client.js or lib/code-review.mjs')
+} else if (clientLanguages.join(',') !== hostLanguages.join(',')) {
+  note(
+    errors,
+    `contract: client.js offers [${clientLanguages.join(', ')}] but lib/code-review.mjs reviews [${hostLanguages.join(', ')}]`,
+  )
+} else {
+  note(passed, `contract: ${hostLanguages.length} language(s) match between panel and reviewer`)
+}
+
 /* report ------------------------------------------------------------------ */
 
 for (const line of passed) console.log(`ok   ${line}`)

@@ -312,6 +312,18 @@ S2 收口时分支覆盖率只有 **77.78%**（`director.mjs` 50%、`scorer.mjs`
 | TC-HIS-221 | I | 归档与整包导出 | 默认不带归档；`archived:true` 才带 | tmpdir |
 | TC-HIS-222 | I | 归档的可见性副作用 | 列表默认消失、`stats.total` 减少、`only` 可见且带标签、取消归档后回来 | tmpdir |
 
+### D3 手撕语言化评审（v0.4）
+
+| 用例 ID | 层级 | 对应 AC | 场景 | 期望 |
+| --- | --- | --- | --- | --- |
+| TC-COD-201 | U | AC-6 | 六种语言的检查点 | `LANGUAGES` 深等 `['java','python','javascript','go','c++','sql']`；每种有 `label`、≥3 条检查点、非空 `caseStyle`，且两两检查点集合不同 |
+| TC-COD-202 | U | AC-6 | 检查点真的进了 system prompt | Java 含空引用与溢出字样；Go 含 nil/goroutine/defer；SQL 含 NULL/索引/事务 |
+| TC-COD-203 | U | AC-6 | 用例要求进 user 消息 | python 消息含 `None` 类输入；`c++` 含 `C++` 与指针/越界/内存字样 |
+| TC-COD-204 | U | AC-6 | 别名与回退 | `Java`/`js`/`py`/`golang`/`cpp`/`C++11`/`mysql` 归一正确；`rust` → `generic` 且 `note` 点名；`undefined` → `generic` + `GENERIC_HINTS` |
+| TC-COD-205 | U | AC-6 | 语言进评分证据 | `reviewCode(..., language:'Go')` → `language==='go'`、`executed===false`、`score.evidence` 有含 `go` 的行 |
+| TC-COD-206 | U | AC-6 | 未知语言仍可评审 | `elixir` → `language==='generic'`、`warnings` 含 `elixir`、`executed===false` |
+| TC-EDG-018 | U | AC-6 | 份数截断 + 缺省语言（**契约变更**） | 模型给 7 条 → 截断为 5；不给 `language` 时 `language==='generic'` 且提示词用通用检查点（原断言为字面量 `unknown`） |
+
 ## 5. 执行与判定
 
 ```bash

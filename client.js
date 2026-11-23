@@ -39,9 +39,19 @@ window.__ModuleLoader__.load({
 // D2: 归档在记录上只是一个标签，与宿主 lib/history.mjs 的 ARCHIVED_TAG 对齐。
 const ARCHIVED_TAG = '已归档'
     const RPC = '/api/dsh-mock-interview/rpc'
-    // Languages the review prompt can speak about; the server stores whatever
-    // string it is given, so this list is a UI convenience, not a contract.
+    // The languages the host keeps a checklist for (lib/code-review.mjs). The
+    // server stores whatever string it is given, but sending one it has no
+    // checklist for silently degrades the review to the generic one — so the
+    // two lists are pinned equal by scripts/contract-lint.mjs.
     const LANGUAGES = ['java', 'python', 'javascript', 'go', 'c++', 'sql']
+    const LANGUAGE_LABELS = {
+      java: 'Java',
+      python: 'Python',
+      javascript: 'JavaScript',
+      go: 'Go',
+      'c++': 'C++',
+      sql: 'SQL',
+    }
 
     const DICT = {
       zh: {
@@ -1604,7 +1614,7 @@ const ARCHIVED_TAG = '已归档'
                 h(Choice, {
                   label: t('run.language'),
                   value: language,
-                  options: LANGUAGES.map((value) => ({ value, label: value })),
+                  options: LANGUAGES.map((value) => ({ value, label: LANGUAGE_LABELS[value] ?? value })),
                   onChange: (value) => setLanguage(value),
                 }))
             : null,

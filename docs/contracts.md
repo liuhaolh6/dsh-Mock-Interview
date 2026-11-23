@@ -178,6 +178,19 @@ v0.4 D1 起，转写这一步由 `asr/transcribe`（§3.15）承担：浏览器�
     不能改变响应的结构（verdict / cases / score 三件套始终存在）——这条由 TC-COD-004 守护。
   - 响应里的 `score` 与 `turn/answer` 用同一套 `buildCard()` 归一（钳制 1..5、缺维 null、
     `overall` 取适用维度算术平均），避免手撕题和八股题两套评分口径；`buildCard(parsed, kind)` 是唯一入口。
+- **语言化评审（v0.4 D3）**：`language` 决定检查点与边界用例的语言习惯，不再是一句装饰性的说明文字。
+  - 支持的语言由 `lib/code-review.mjs` 的 `LANGUAGES` 钉死：`java` / `python` / `javascript` / `go` / `c++` / `sql`，
+    每种语言自带 ≥3 条专属检查点（`LANGUAGE_HINTS[x].checklist`）与用例习惯（`caseStyle`），
+    例如 Java 查空引用与 int 溢出、Go 查 nil map/defer 捕获/goroutine 泄漏、SQL 查三值逻辑与索引可用性。
+  - 别名归一（`resolveLanguage`）：`Java`/`JAVA`/`jdk`/`java17` → `java`，`js`/`node`/`ts`/`typescript` → `javascript`，
+    `py`/`python3` → `python`，`golang` → `go`，`cpp`/`cc`/`C++11`/`C++17` → `c++`，`mysql`/`postgres`/`postgresql`/`sqlite` → `sql`。
+  - 未给语言或给了没准备过的语言（`rust`、`elixir`…）**不报错**：改用 `GENERIC_HINTS` 通用检查点，
+    响应 `language` 为 `'generic'`，并在 `warnings` 里点名原语言（含 `elixir` 字样）——降级必须说出来，不许静默。
+  - 响应新增 `language` 字段（归一后的 canonical 值）；`score.evidence` 的**首行**固定为
+    「按 <语言标签> 的检查点静态评审（未执行）：<第一条检查点>」，让报告脱离会话也知道按什么标准评的。
+  - 面板的语言胶囊与宿主 `LANGUAGES` 必须逐项相等，由 `scripts/contract-lint.mjs` 的
+    「language(s) match between panel and reviewer」一条守护（面板显示 `Java`/`JavaScript`/`C++` 等标签，值仍是 canonical 串）。
+  - 空代码分支同样带 `language`（也走归一），但**不消耗**模型调用。
 
 ### 2.1 `Report` 附加字段（S5 实现记录）
 
