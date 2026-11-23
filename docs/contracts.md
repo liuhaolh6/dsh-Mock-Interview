@@ -189,7 +189,7 @@
 | `sampleAdequate` | boolean | `answered >= 3`；false 时报告标注「样本不足，仅供参考」 |
 | `overall` | number \| null | 逐题适用维度平均的再平均，保留 1 位；无分则 `null` |
 | `dims` | Record<string, number\|null> | 与 `radar.dims` 同一份数据（雷达图与表格共用） |
-| `items` | array | 逐题 `{questionId, kind, target, topic, overall, verdict, missing}` |
+| `items` | array | 逐题 `{questionId, kind, target, topic, overall, verdict, missing, inputMode, answer, reference, evidence, cases, warnings, probe}`（后 7 个字段 v0.2 B4 加入，用于复盘） |
 | `weaknesses` | array | `{dimension, average, action}`，与 `weakTop3`/`actions` 同序 |
 
 两条判定规则（实现层固化，不得在 UI 侧另算）：
@@ -214,10 +214,11 @@
 - 边界：一题未答也能结束（报告标注「样本不足」）；重复调用返回同一份报告（幂等，`status` 已为 `finished` 时直接回放）。
 
 ### 3.9 `report/export`
-- 请求：`{ "op": "report/export", "sessionId": "...", "dir": "./interview-reports" }`（`dir` 缺省即该值）
-- 响应：`{ "path": "D:/project/interview-reports/2026-11-23-…md", "bytes": 4210 }`
+- 请求：`{ "op": "report/export", "sessionId": "...", "dir": "./interview-reports", "format": "md|json" }`（`dir` 缺省即该值；`format` 缺省 `md`，v0.2 B4）
+- 响应：`{ "path": "D:/project/interview-reports/2026-11-23-….md", "bytes": 4210 }`；`format:"json"` 时扩展名为 `.json`，内容是完整 `Report` 的格式化 JSON（可 `JSON.parse` 读回）
 - 失败：`E_SESSION_NOT_FOUND`、`E_EXPORT_FAILED`（不可写/磁盘满）、`E_BAD_REQUEST`（`dir` 越出允许根目录）。
-- 边界：同名文件追加 `-2`、`-3`；只允许写到当前工作目录或其子目录。
+- 边界：同名文件追加 `-2`、`-3`（按扩展名各自计数）；相对路径只允许写到当前工作目录或其子目录，绝对路径由用户显式指定；`format` 只接受 `md` / `json`，其它值 `E_BAD_REQUEST`（不静默降级）。
+- **只读语义**：导出任意历史记录都不修改该会话文件（未结束的会话也不会因为导出而被标成 finished），`TC-REP-011` 逐字节比对守护。
 - 幂等：是（相同内容重复导出产生新文件，不覆盖已有报告）。
 
 ### 3.10 `session/delete`

@@ -118,6 +118,10 @@ window.__ModuleLoader__.load({
         'records.cancel': '取消',
         'records.saved': '已保存',
         'records.deleted': '已删除 {n} 条',
+        'records.exportMd': '导出 MD',
+        'records.exportJson': '导出 JSON',
+        'report.format.md': 'Markdown',
+        'report.format.json': 'JSON',
         'records.score': '得分',
         'records.turns': '{n} 题',
       },
@@ -167,6 +171,10 @@ window.__ModuleLoader__.load({
         'records.cancel': 'Cancel',
         'records.saved': 'Saved',
         'records.deleted': 'Deleted {n}',
+        'records.exportMd': 'Export MD',
+        'records.exportJson': 'Export JSON',
+        'report.format.md': 'Markdown',
+        'report.format.json': 'JSON',
         'records.score': 'Score',
         'records.turns': '{n} questions',
       },
@@ -478,7 +486,8 @@ window.__ModuleLoader__.load({
             onChange: (event) => props.onDirChange(event.target.value),
           })),
         h('div', { style: { ...styles.row, marginTop: '16px' } },
-          h('button', { type: 'button', style: props.busy ? styles.primaryOff : styles.primary, onClick: props.onExport, disabled: props.busy }, t('report.export')),
+          h(Choice, { value: props.exportFormat, options: ['md', 'json'], labels: props.exportFormatLabels, onChange: props.onFormatChange }),
+          h('button', { type: 'button', style: props.busy ? styles.primaryOff : styles.primary, onClick: () => props.onExport(props.exportFormat), disabled: props.busy }, t('report.export')),
           h('button', { type: 'button', style: styles.button, onClick: props.onRestart }, t('report.again')),
           props.exportPath !== '' ? h('span', { style: styles.ok }, `${t('report.exported')}${props.exportPath}`) : null,
         ),
@@ -506,6 +515,7 @@ window.__ModuleLoader__.load({
       const [report, setReport] = useState(null)
       const [exportPath, setExportPath] = useState('')
       const [exportDir, setExportDir] = useState('')
+      const [exportFormat, setExportFormat] = useState('md')
       const [records, setRecords] = useState([])
       const [recordsTotal, setRecordsTotal] = useState(0)
       const [recordQuery, setRecordQuery] = useState('')
@@ -621,18 +631,18 @@ window.__ModuleLoader__.load({
         })
       }, [session, onError])
 
-      const exportReport = useCallback(() => {
-        if (session === null) return
+      const exportReport = useCallback((format = exportFormat, sessionId = null) => {
+        if (session === null && sessionId === null) return
         setBusy(true)
         setError('')
-        const body = { sessionId: session.sessionId }
+        const body = { sessionId: sessionId ?? session.sessionId, format }
         if (exportDir.trim() !== '') body.dir = exportDir.trim()
         rpc('report/export', body).then((result) => {
           setBusy(false)
           if (!result.ok) return onError(result)
           setExportPath(result.value.path ?? '')
         })
-      }, [session, exportDir, onError])
+      }, [session, exportDir, exportFormat, onError])
 
       const recordsBody = (next = {}) => {
         const query = next.query === undefined ? recordQuery : next.query
@@ -827,6 +837,8 @@ window.__ModuleLoader__.load({
                           style: styles.button,
                           onClick: () => setEditing({ id: record.id, title: record.title, tagsText: record.tags.join('，'), note: '' }),
                         }, t('records.rename')),
+                        h('button', { type: 'button', style: styles.button, onClick: () => exportReport('md', record.id) }, t('records.exportMd')),
+                        h('button', { type: 'button', style: styles.button, onClick: () => exportReport('json', record.id) }, t('records.exportJson')),
                         h('button', { type: 'button', style: styles.button, onClick: () => removeOne(record) }, t('records.delete')),
                       ),
                       editing !== null && editing.id === record.id
@@ -971,8 +983,11 @@ window.__ModuleLoader__.load({
             busy,
             exportPath,
             exportDir,
+            exportFormat,
+            exportFormatLabels: { md: t('report.format.md'), json: t('report.format.json') },
+            onFormatChange: setExportFormat,
             onDirChange: setExportDir,
-            onExport: exportReport,
+            onExport: () => exportReport(exportFormat),
             onRestart: reset,
           }),
           error !== '' ? h('div', { style: styles.bad }, error) : null,

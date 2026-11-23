@@ -261,6 +261,7 @@ export async function dispatch(request, deps = {}) {
         const exported = await exportReport({
           report,
           dir: body.dir,
+          format: body.format,
           cwd: exportBase(deps),
         })
         return ok(exported)

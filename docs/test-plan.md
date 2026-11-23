@@ -268,6 +268,15 @@ S2 收口时分支覆盖率只有 **77.78%**（`director.mjs` 50%、`scorer.mjs`
 | TC-BNK-101 | integration | 两次空答后 `next.type` 从 probe 变 question，同题只留一条 turn |
 | TC-BNK-102 | integration | 有内容的作答把 `emptyStreak` 归零 |
 
+### B4 报告与导出扩展（v0.2）
+
+| 用例 | 层级 | 守护的东西 |
+| --- | --- | --- |
+| TC-REP-007 | integration | `format:"json"` 写 `.json` 且可 `JSON.parse` 读回；逐题含 `answer` 与 `reference` |
+| TC-REP-009 | integration | 未知格式 `pdf` → `E_BAD_REQUEST`，不回落成 md |
+| TC-REP-010 | integration | Markdown 含「逐题原文与参考解」、你的回答、参考解、扣分依据与「未真实执行」声明 |
+| TC-REP-011 | integration | 导出历史记录前后会话文件逐字节相同，状态不被改写 |
+
 ## 5. 执行与判定
 
 ```bash
