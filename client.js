@@ -395,7 +395,7 @@ window.__ModuleLoader__.load({
       },
       prompt: { fontSize: '15px', lineHeight: 1.7, margin: '0 0 12px', whiteSpace: 'pre-wrap' },
       badge: { fontSize: '11px', padding: '2px 8px', borderRadius: '999px', border: '1px solid currentColor', opacity: 0.7 },
-      detail: { border: '1px solid currentColor', borderOpacity: 0.2, borderRadius: '8px', padding: '8px 10px', marginTop: '8px' },
+      detail: { border: '1px solid rgba(127, 127, 127, 0.45)', borderRadius: '8px', padding: '8px 10px', marginTop: '8px' },
       summary: { cursor: 'pointer', fontWeight: 600 },
       pre: { whiteSpace: 'pre-wrap', fontSize: '12px', margin: '8px 0', padding: '8px', borderRadius: '6px', background: 'rgba(127, 127, 127, 0.12)' },
       ok: { fontSize: '12px', color: 'var(--mi-ok, #0b6b3a)' },

@@ -2,7 +2,7 @@
 
 DeepSeek Harness 插件：**模拟技术面试官**。把简历和目标岗位喂进去，它会按真实面试的节奏连问你——八股、简历项目深挖、手撕代码、行为面——支持文字和语音作答，每题给分并指出「哪句答错、缺什么、怎么补」，最后导出一份可复盘的 Markdown 报告。
 
-> 当前状态：**v0.3 体验打磨进行中**（C1 错误人话化、C2 进度感、C3 空态与单主动作、C4 键盘可达性、C5 记录统计、C6 深浅色跟随、C7 报告折叠与复制已完成；v0.2.0 功能补齐已收口）（v0.1.0 已交付并打点，见 [docs/delivery-report.md](docs/delivery-report.md)；人工验收见 [docs/acceptance.md](docs/acceptance.md)）。v0.2 排期见 [mock-interview-roadmap-v0.2.md](../../04-docs/mock-interview-roadmap-v0.2.md)。
+> 当前状态：**v0.3.0 已交付**（体验打磨七批 C1–C7 全部完成：错误人话化、进度感、空态与单主动作、键盘可达性、记录统计与趋势、深浅色跟随、报告折叠与复制；v0.2.0 功能补齐已收口）（v0.1.0 已交付并打点，见 [docs/delivery-report.md](docs/delivery-report.md)；人工验收见 [docs/acceptance.md](docs/acceptance.md)）。v0.2 排期见 [mock-interview-roadmap-v0.2.md](../../04-docs/mock-interview-roadmap-v0.2.md)。
 > 已实现：`lib/profile.mjs`（简历+JD → 画像）、`lib/session.mjs`（按时长定额、按本人技能/项目定靶）、
 > `lib/director.mjs`（按难度定措辞、结论式回答追问一次）、`lib/scorer.mjs`（六维评分 + 适用维度平均 + 越界钳制 + 无证据重试 + 空答 0 分）、
 > `lib/code-review.mjs`（手撕静态评审 + 5 条边界推演，恒 `executed:false`）、`lib/store.mjs`（原子写、2 MB 写前拦截、批量删除）、
