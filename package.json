@@ -1,6 +1,6 @@
 {
   "name": "dsh-mock-interview",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Mock interview coach for DeepSeek Harness: feed it a resume and a target role, sit a realistic technical interview (fundamentals, project deep-dives, live coding), then read a scored report with concrete fixes.",

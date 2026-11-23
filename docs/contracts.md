@@ -361,7 +361,7 @@ note: string         // 复盘备注，只在 session/get 里返回全文
 
 ```json
 {
-  "pong": true, "version": "0.4.0", "schemaVersion": 2, "at": 0,
+  "pong": true, "version": "0.3.0", "schemaVersion": 2, "at": 0,
   "theme": {
     "scheme": "dark", "bg": "#12161b", "surface": "#1b2027",
     "text": "#e6edf3", "muted": "#9aa4b2", "border": "#3d444d",
