@@ -582,7 +582,12 @@ window.__ModuleLoader__.load({
       }, [])
 
       const onError = useCallback((failure) => {
-        setError(`${t('error.prefix')} ${failure.code}: ${failure.message}`)
+        const hint = failure?.hint
+        if (hint === undefined || hint === null) {
+          setError(`${t('error.prefix')} ${failure.code}: ${failure.message}`)
+          return
+        }
+        setError(`${hint.title}｜${hint.action}（${failure.code}）`)
       }, [t])
 
       const extract = useCallback(() => {

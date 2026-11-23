@@ -17,6 +17,7 @@ import { basename, dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 
 import { ACTIONS, ERROR_CODES, LIMITS, RPC_PATH, SCHEMA_VERSION } from './lib/contracts.js'
+import { explainError } from './lib/messages.mjs'
 import { reviewCode } from './lib/code-review.mjs'
 import { decideProbe } from './lib/director.mjs'
 import { ContractError, isContractError } from './lib/errors.mjs'
@@ -44,8 +45,9 @@ function ok(value) {
 
 /** Business failure envelope; `code` must exist in ERROR_CODES (lint-enforced). */
 function fail(code, message) {
+  const text = message === undefined ? ERROR_CODES[code] ?? '' : message
   return Response.json(
-    { ok: false, error: { code, message: message === undefined ? ERROR_CODES[code] ?? '' : message } },
+    { ok: false, error: { code, message: text, hint: explainError(code, text) } },
     { status: 200, headers: JSON_HEADERS },
   )
 }
@@ -384,7 +386,7 @@ async function handle(req, res, deps) {
     write(response.status, await response.text())
   } catch (problem) {
     const message = problem instanceof Error ? problem.message : String(problem)
-    write(500, JSON.stringify({ ok: false, error: { code: 'E_INTERNAL', message } }))
+    write(500, JSON.stringify({ ok: false, error: { code: 'E_INTERNAL', message, hint: explainError('E_INTERNAL', message) } }))
   }
 }
 
@@ -599,4 +601,4 @@ export function apply(ctx) {
   })
 }
 
-export { RPC_PATH, SCHEMA_VERSION }
+export { handle, RPC_PATH, SCHEMA_VERSION }

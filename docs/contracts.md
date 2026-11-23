@@ -289,6 +289,32 @@ note: string         // 复盘备注，只在 session/get 里返回全文
 `verdict 与边界用例结论不一致：以用例为准，建议人工复核这段代码`
 
 考生看到的报告里，用例明细才是证据，`verdict` 只是模型的判断。
+### 4.0 错误提示的 hint 字段（v0.3 C1）
+
+所有失败信封在 `error` 里除 `code` / `message` 外还带 `hint`：
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "E_LLM_UNAVAILABLE",
+    "message": "model qwen not reachable",
+    "hint": {
+      "code": "E_LLM_UNAVAILABLE",
+      "title": "模型暂时不可用",
+      "detail": "宿主没有可用模型路由，或上游服务返回了错误。\n服务器原话：model qwen not reachable",
+      "action": "稍等一会儿重试；一直失败请检查宿主的模型配置。",
+      "retryable": true
+    }
+  }
+}
+```
+
+- 文案来自 `lib/messages.mjs`，一个错误码一条，**客户端不得自建映射**（否则两半说法会漂移）。
+- `retryable` 表达的是「重试是不是一个诚实承诺」，客户端据此决定是否显示「重试」按钮。
+- `handle()` 的 500 兜底同样带 hint（`E_INTERNAL`），保证崩溃也不会露出裸错误码。
+- 未知码回退到通用文案，`code` 原样保留，方便用户反馈。
+
 ## 4. 错误码全表
 
 | code | 触发 | 可重试 | 前端表现 |

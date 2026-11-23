@@ -406,3 +406,17 @@ ACTIONS 十项全部有实现；UI 侧不重复计算分数，只渲染宿主给
 | TC-EDG-042 | U | 相对路径越界拒绝、绝对路径按用户指定直接使用 | ✅ |
 | TC-REP-004 | I | 绝对导出目录成功落盘（此前误判 `E_BAD_REQUEST`） | ✅ |
 | TC-RPC-008 | I | `code/review` 的 `verdict` 与 `cases` 矛盾时给 warning，`verdict` 不改写 | ✅ |
+
+### C1 错误人话化（v0.3）
+
+| ID | 层级 | 场景 | 断言 |
+|---|---|---|---|
+| TC-MSG-001 | U | 每个契约错误码都有解释 | title/detail/action 均非空，码集合与契约一致 |
+| TC-MSG-002 | U | 文案不泄露术语 | title 里没有 `E_`、没有 `undefined` |
+| TC-MSG-003 | U | 未知码 | 回退通用文案且保留 code |
+| TC-MSG-004 | U | 可重试语义 | 超时/不可用/评分失败/导出失败为 true，参数错/找不到/已结束为 false |
+| TC-MSG-005 | U | 服务器原话保留 | detail 含服务器 message |
+| TC-MSG-010 | I | 失败信封带 hint | `error.hint` 与 `explainError` 深相等 |
+| TC-MSG-011 | I | 畸形请求 | `E_BAD_REQUEST` 也给 hint |
+| TC-MSG-012 | I | 存储失败 | 保留自己的 code 且 retryable=true |
+| TC-MSG-013 | I | 500 兜底 | `E_INTERNAL` 带 hint，message 含原始异常 |
