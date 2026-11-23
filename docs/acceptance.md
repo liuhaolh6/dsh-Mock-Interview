@@ -144,6 +144,7 @@ node "D:/agent/DeepseekHarness/resources/runtime/primary-runtime/dependencies/pn
 | V-10 | 保存后的返回摘要 | ❌ 偏差：`kinds` 全是 0（已修，TC-BNK-213） |
 | V-11 | 新建面试取题 | `plan.bankSource:"custom"`，题面出现「自定：Redis 大 Key 怎么拆」「自定：订单中心幂等设计复盘」✅ |
 | V-12 | 最后一题的类型 | ❌ 偏差：最后一条靶子是 `skill:MySQL` 却标成 `kind:"code"`，且与倒数第二位重复（已修，TC-SES-008/009/010） |
+| V-13 | 手撕题评审（`code/review`） | ❌ 偏差：真机 20 778 ms 后 `E_LLM_UNAVAILABLE`「模型输出被截断（max-tokens）」——评审 JSON 撑破了 4096 token（已修：评审专用 6144 + 提示词压篇幅，TC-COD-207） |
 
 仍未验证（需要人）：浏览器 `MediaRecorder` 真录音（麦克风权限、webm 头）、滚轮手感、以及修复后在真机上重看 `kinds` 与最后一题。
 

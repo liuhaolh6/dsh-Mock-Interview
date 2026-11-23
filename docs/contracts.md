@@ -192,6 +192,13 @@ v0.4 D1 起，转写这一步由 `asr/transcribe`（§3.15）承担：浏览器�
   - 面板的语言胶囊与宿主 `LANGUAGES` 必须逐项相等，由 `scripts/contract-lint.mjs` 的
     「language(s) match between panel and reviewer」一条守护（面板显示 `Java`/`JavaScript`/`C++` 等标签，值仍是 canonical 串）。
   - 空代码分支同样带 `language`（也走归一），但**不消耗**模型调用。
+  - **输出预算与篇幅（v0.4 返修）**：评审要的 JSON（5 条边界用例 + 六维 + 证据 + 参考解）比一次评分卡长得多，
+    共用 `LIMITS.llmMaxTokens = 4096` 时真机实测被写完 → `finish.reason.kind === 'max-tokens'` →
+    `E_LLM_UNAVAILABLE`「模型输出被截断」（2026-11-24 真机 20 778 ms 复现）。
+    因此评审单独用 `LIMITS.llmReviewMaxTokens = 6144`（`complete({ …, maxTokens })`，`llmBridge` 以
+    `maxTokens ?? LIMITS.llmMaxTokens` 兜底），并在系统提示里压住篇幅：cases 三段各 ≤60 字，
+    evidence/missing 各 ≤3 条且每条 ≤40 字，reference ≤3 条且每条 ≤40 字，禁 Markdown 与代码块。
+    截断仍按 `E_LLM_UNAVAILABLE` 报错并允许重试，**不会**把半截 JSON 当评分卡（守护：TC-COD-207）。
 
 ### 2.1 `Report` 附加字段（S5 实现记录）
 

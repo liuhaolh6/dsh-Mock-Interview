@@ -7,6 +7,7 @@ import {
   LANGUAGES,
   buildReviewPrompt,
   resolveLanguage,
+  reviewCode,
 } from '../../lib/code-review.mjs'
 import { fakeLlm } from '../helpers/fake-llm.mjs'
 import { REVIEW_OK } from '../fixtures/score.mjs'
@@ -18,6 +19,29 @@ const ITEM = { id: 'q-9', kind: 'code', topic: '算法：链表反转', target: 
 function promptFor(language) {
   return buildReviewPrompt({ item: ITEM, code: 'func solve(){}\n', language })
 }
+
+test('TC-COD-207 a review asks for a bigger output budget and a bounded shape', async () => {
+  const calls = []
+  const complete = async (options) => {
+    calls.push(options)
+    return JSON.stringify(REVIEW_OK)
+  }
+  const reviewed = await reviewCode({
+    item: { id: 'q-1', kind: 'code', topic: '算法：LRU', target: 'bank:算法：LRU' },
+    code: 'class LRU {}',
+    language: 'java',
+    complete,
+  })
+  assert.equal(reviewed.cases.length, 5)
+  // 5 条用例 + 六维 + 证据 + 参考解，4 096 真机实测会被写完（截断 = E_LLM_UNAVAILABLE）。
+  assert.ok(
+    typeof calls[0].maxTokens === 'number' && calls[0].maxTokens >= 6_000,
+    `expected a review-specific budget, got ${calls[0].maxTokens}`,
+  )
+  // 光加预算不够：还得压住模型的篇幅，否则重试一次仍然截断。
+  assert.match(calls[0].system, /不要代码块/, 'expected the prompt to forbid code blocks')
+  assert.match(calls[0].system, /不超过/, 'expected per-field length caps')
+})
 
 test('TC-COD-201 each supported language gets its own checklist instead of a generic one', () => {
   assert.deepEqual([...LANGUAGES], ['java', 'python', 'javascript', 'go', 'c++', 'sql'])

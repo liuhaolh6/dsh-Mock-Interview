@@ -708,7 +708,7 @@ async function defaultRoute(scope, llm) {
 function llmBridge(scope) {
   const llm = typeof scope?.get === 'function' ? scope.get('llm') : undefined
   if (llm === undefined || typeof llm.stream !== 'function') return undefined
-  return async ({ system, messages, signal }) => {
+  return async ({ system, messages, signal, maxTokens }) => {
     const route = await defaultRoute(scope, llm)
     if (route === undefined) {
       throw new ContractError('E_LLM_UNAVAILABLE', '宿主没有可用的默认模型，无法评分')
@@ -717,7 +717,7 @@ function llmBridge(scope) {
     let failure
     const stream = llm.stream({
       ...route,
-      maxTokens: LIMITS.llmMaxTokens,
+      maxTokens: maxTokens ?? LIMITS.llmMaxTokens,
       system,
       messages: toRequestMessages(messages, system),
       signal,
