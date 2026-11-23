@@ -164,16 +164,25 @@ test('TC-BNK-006 buildPlan honours a custom bank path', async () => {
     )
     assert.equal(plan.items.length, 5)
     assert.ok(plan.items.every((item) => typeof item.target === 'string'))
+    // 契约变更（v0.4 返修）：手撕题固定收尾——原先「谁落在最后一格就把谁标成
+    // code」，会把 Kubernetes 调度这种理论题配上手写代码编辑器。
+    assert.equal(plan.items.at(-1).kind, 'code')
+    assert.equal(plan.items.at(-1).target, 'bank:算法：二分', 'the code topic closes the run')
     assert.deepEqual(
-      plan.items.slice(0, 3).map((item) => item.target),
-      ['skill:Kubernetes', 'bank:Kubernetes 调度', 'bank:算法：二分'],
+      [...new Set(plan.items.map((item) => item.target))].sort(),
+      ['bank:Kubernetes 调度', 'bank:算法：二分', 'skill:Kubernetes'],
+      'every target of the custom bank still shows up exactly once as a distinct target',
     )
     assert.deepEqual(
-      plan.items.slice(0, 3).map((item) => item.kind),
-      ['skill', 'skill', 'code'],
+      plan.items.find((item) => item.target === 'bank:Kubernetes 调度').kind,
+      'skill',
+      'a theory topic stays a skill question',
+    )
+    assert.deepEqual(
+      plan.items.find((item) => item.target === 'bank:算法：二分').kind,
+      'code',
       'a bank topic declared as code must become a whiteboard question',
     )
-    assert.equal(plan.items.at(-1).kind, 'code')
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

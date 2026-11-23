@@ -96,6 +96,7 @@
 - 响应：`{ "sessionId": "...", "plan": Plan }`
 - 失败：`E_PROFILE_INCOMPLETE`（无技能且无项目）、`E_BAD_REQUEST`（枚举越界）、`E_LLM_TIMEOUT`。
 - 边界：`minutes` 越界 → `E_BAD_REQUEST`；`budget` 由 `DURATIONS` 决定 5/9/13，允许 ±2 的实际出题偏差。
+- **手撕题收尾规则（v0.4 返修）**：题单最后一条**永远是真正的手撕题**——靶子必须来自 `kind: "code"` 的题库条目（当前题库没有手撕题时，退回打包题库 `data/bank.json` 里的手撕题）。绝不把「恰好落在最后一格」的理论题改成 `kind: "code"`：那会让面板给一道 MySQL 理论题配手写代码编辑器（`TC-SES-008`/`TC-SES-009`）。当前题库有手撕题时用它，不用打包题库（`TC-SES-010`）。题量多于靶子数时按顺序循环取题，同一靶子可能重复出现，但 `kind` 始终与靶子一致。
 - 幂等：否（每次创建新会话）。
 - **再面一次（v0.4 D2）**：请求加 `{ "fromSessionId": "..." }` 时，`profile`/`mode`/`difficulty`/`minutes` 从该会话继承，显式给出的字段优先；`turns` 清空、标签清空、新 id。题单**重新生成**：上一场问过的靶子作为 `avoid` 传入 `buildPlan`，排到队尾，并按「题库 / 简历」交替取，保证新题单与旧题单不同的题目**不少于一半**（`TC-HIS-211`）。`fromSessionId` 不存在 → `E_SESSION_NOT_FOUND`；空字符串 → `E_BAD_REQUEST`。
 

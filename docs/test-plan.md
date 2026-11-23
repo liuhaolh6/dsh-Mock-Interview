@@ -538,6 +538,23 @@ ACTIONS 十项全部有实现；UI 侧不重复计算分数，只渲染宿主给
 
 > 面板侧用 CSS 自定义属性 `--mi-*` 承接配色，`contract-lint` 禁止旧的低对比色值回流。
 
+### 返修：真机验证发现的两处偏差（2026-11-24）
+
+真机按「配转写端点 → 录一句话 → 存题库 → 新建面试」走一遍，抓到两个源码测试没覆盖到的问题：
+
+1. `bank/save` 返回的 `kinds` 全是 0（`writeCustomBank` 只回 `{path,count,warnings}`，`index.js` 拿空 `topics` 去算 `kinds`），与契约 §3.18 不符。
+2. 题单最后一条被无条件改成 `kind:'code'`，靶子却是 `skill:MySQL` → 面板会给理论题配手写代码编辑器，且与倒数第二位靶子重复。
+
+| 用例 ID | 层级 | 场景 | 期望 |
+| --- | --- | --- | --- |
+| TC-BNK-213 | I | `bank/save` 的返回摘要 | `kinds` 与 `bank/validate` 一致（本批新增 `countKinds`） |
+| TC-SES-008 | U | 简历题多于预算、题库无手撕题 | `skill:`/`project:` 靶子的 `kind` 不得是 `code` |
+| TC-SES-009 | U | 题库里没有手撕题 | 仍有一道真手撕题（来自打包题库），且收尾 |
+| TC-SES-010 | U | 题库自带手撕题 | 用题库那道，不退回打包题库 |
+| TC-BNK-006 | U | 契约变更 | 断言改为「手撕题收尾 + 每个靶子只出现一次；理论题仍是 skill」（原断言记录的是「谁在最后一格谁变 code」的旧行为） |
+
+红基线：新增/改动前 `npm test` → `tests 233 / pass 229 / fail 4`，失败恰为 TC-BNK-213、TC-SES-008/009/010；修复后 233/233。
+
 ### 返修：面板滚轮划不动（2026-11-24）
 
 用户在真机反馈「那个页面滚轮划不动」。根因是页面根节点只声明了 `maxWidth`，没有 `height`/`overflow`：宿主 `main` 槽给的是一个定高且**不滚动**的盒子（对照 `dsh-collections` 的 `.dsc_root{height:100%}` + `.dsc_main{overflow:auto}`），所以内容超出后被裁掉，滚轮无事可做。

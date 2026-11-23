@@ -309,7 +309,7 @@ export async function dispatch(request, deps = {}) {
 
       case 'bank/save': {
         const saved = await writeCustomBank({ home: resolveHome(deps), bank: body.bank })
-        return ok({ ...bankSummary({ topics: [], warnings: saved.warnings }), path: saved.path, count: saved.count })
+        return ok({ count: saved.count, kinds: saved.kinds, warnings: saved.warnings, path: saved.path })
       }
 
       case 'bank/get': {

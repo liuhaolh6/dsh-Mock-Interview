@@ -72,6 +72,14 @@ test('TC-BNK-210 a saved custom bank becomes the bank the next run draws from', 
   await rm(home, { recursive: true, force: true })
 })
 
+test('TC-BNK-213 bank/save reports the kinds it actually stored', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'dsh-mi-save-'))
+  const saved = await call({ op: 'bank/save', bank: CUSTOM }, { home })
+  assert.equal(saved.ok, true)
+  assert.equal(saved.value.count, 3)
+  assert.deepEqual(saved.value.kinds, { skill: 1, project: 1, behavior: 0, code: 1 })
+})
+
 test('TC-BNK-211 a bad bank is refused by both validate and save, and nothing is written', async () => {
   const home = await mkdtemp(join(tmpdir(), 'dsh-mock-interview-d4-'))
 

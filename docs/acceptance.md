@@ -126,6 +126,27 @@ node "D:/agent/DeepseekHarness/resources/runtime/primary-runtime/dependencies/pn
 
 仍未人工验证：在真机面板里粘贴一份题库、点「校验」「保存并启用」，再新建一场面试确认题目来自自定义题库。
 
+## 真机验证：语音 / 题库 / 出题（2026-11-24，宿主 v0.4.0，端口 49165）
+
+由 agent 用 RPC 逐条跑通（等价于面板点击的宿主侧），结果与偏差：
+
+| 编号 | 动作 | 结果 |
+| --- | --- | --- |
+| V-1 | 未配端点时转写 | `E_ASR_NOT_CONFIGURED`，`hint.retryable:false`，文案指向「配端点或改用文字」 ✅ |
+| V-2 | 写端点配置 | 返回 `hasKey:true` + `keyMask:"sk-m…7890"`，**不回传明文 Key**；落盘 `$DSH_HOME/storages/dsh-mock-interview/asr.json` ✅ |
+| V-3 | 部分更新（只换 model） | Key 保留、掩码不变 ✅ |
+| V-4 | 真实转写（起了一个本地 mock 端点） | `{text:"这是我从语音转写出来的一句话"}`，首尾空白被折叠；mock 收到 `/v1/audio/transcriptions`、`multipart/form-data`、`model` 段、`file` 段 `audio/webm`、音频字节原样 ✅ |
+| V-5 | 端点返回空文本 | `E_ASR_FAILED`「语音转写返回了空文本」，可重试 ✅ |
+| V-6 | 端点不可达 | `E_ASR_FAILED`「转写端点调用失败：fetch failed」，`retryable:true` ✅ |
+| V-7 | 非法容器 / 超 120 秒 | 均 `E_BAD_REQUEST`，文案点名可选容器与 120 秒上限 ✅ |
+| V-8 | 清空配置 | `hasKey:false`，`asr.json` 已删除（目录只剩 `sessions/`） ✅ |
+| V-9 | 校验并保存 3 题题库 | 校验 `count:3`、`kinds {skill:1,project:1,behavior:0,code:1}`；保存后 `bank/get` 显示 `active.source:"custom"` ✅ |
+| V-10 | 保存后的返回摘要 | ❌ 偏差：`kinds` 全是 0（已修，TC-BNK-213） |
+| V-11 | 新建面试取题 | `plan.bankSource:"custom"`，题面出现「自定：Redis 大 Key 怎么拆」「自定：订单中心幂等设计复盘」✅ |
+| V-12 | 最后一题的类型 | ❌ 偏差：最后一条靶子是 `skill:MySQL` 却标成 `kind:"code"`，且与倒数第二位重复（已修，TC-SES-008/009/010） |
+
+仍未验证（需要人）：浏览器 `MediaRecorder` 真录音（麦克风权限、webm 头）、滚轮手感、以及修复后在真机上重看 `kinds` 与最后一题。
+
 ## 返修：面板滚轮（2026-11-24）
 
 | 编号 | 验收动作 | 判定标准 | 结果 |
