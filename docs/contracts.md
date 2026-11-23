@@ -105,9 +105,11 @@
 - 幂等：是（AC-7 断线续考的唯一入口）。
 
 ### 3.5 `session/list`
-- 请求：`{ "op": "session/list", "limit": 20 }`
-- 响应：`{ "sessions": [{ id, createdAt, status, mode, turns: 5, overall: 3.1 }] }`
-- 失败：`E_BAD_REQUEST`（`limit` 非 1–100 整数）。幂等：是。
+- 请求：`{ "op": "session/list", "limit": 20, "offset": 0, "query": "", "status": "active|finished", "mode": "tech-1|project|algo|behavior", "difficulty": "junior|mid|senior", "tag": "", "sort": "recent|oldest|score" }`（除 `limit` 外全部可缺省）
+- 响应：`{ "sessions": [{ id, title, createdAt, status, mode, difficulty, tags, turns: 5, overall: 3.1 }], "total": 12, "hasMore": true }`
+- 失败：`E_BAD_REQUEST`（`limit` 非 1–100 整数、`offset` 非非负整数、`sort`/`status`/`mode`/`difficulty` 非法枚举）。
+- 语义（v0.2 B1）：`query` 对 `title`、`tags`、`note`、`mode`、`difficulty` 做**不区分大小写的子串匹配**；各类筛选与搜索是 AND 关系，互不覆盖；`sort` 缺省 `recent`（`updatedAt` 降序），`oldest` 升序，`score` 按 `overall` 降序且 `null` 排最后；分页在排序之后切片，`hasMore = offset + 本次条数 < total`；响应不返回排序键 `updatedAt`/`note`（列表只给摘要）。
+- 幂等：是。
 
 ### 3.6 `turn/answer`
 - 请求：`{ "op": "turn/answer", "sessionId": "...", "questionId": "q1", "answer": "…", "inputMode": "text|voice" }`
@@ -208,9 +210,32 @@
 - 幂等：是（相同内容重复导出产生新文件，不覆盖已有报告）。
 
 ### 3.10 `session/delete`
-- 请求：`{ "op": "session/delete", "sessionId": "..." }`
-- 响应：`{ "deleted": true }`
-- 失败：`E_SESSION_NOT_FOUND`。幂等：是（已删除再删仍返回 `deleted: true`）。
+- 请求（单条）：`{ "op": "session/delete", "sessionId": "..." }`
+- 请求（批量）：`{ "op": "session/delete", "ids": ["...", "..."] }`
+- 响应：单条 `{ "deleted": true }`（保持 v0.1 形状）；批量 `{ "deleted": 2 }`，`deleted` 是**实际存在并被删除**的条数。
+- 失败：`E_BAD_REQUEST`（`sessionId` 与 `ids` 都缺、二者同时给、`ids` 非数组、`ids` 超 50 条或含非字符串）；`E_SESSION_NOT_FOUND` 不再出现（单条删除也是幂等的）。
+- 幂等：是（单条重复删仍 `{deleted:true}`；批量里不存在的 id 记 0 条，不报错）。
+- 边界：批量删除先删存在的、再返回计数；单个 id 的删除失败（非 `ENOENT`）整体报错，不静默跳过。
+
+### 3.11 `session/update`（v0.2 B1）
+- 请求：`{ "op": "session/update", "sessionId": "...", "title"?: "...", "tags"?: ["..."], "note"?: "..." }`
+- 响应：`{ "session": SessionMeta }`，其中 `SessionMeta = { id, title, tags, note, status, mode, difficulty, createdAt, updatedAt, turns, overall }`
+- 失败：`E_SESSION_NOT_FOUND`；`E_BAD_REQUEST`（三类字段一个都没给；`title` 非字符串或去空白后为空或超 80 字；`tags` 非字符串数组、超 10 个、含空项或单项超 24 字；`note` 非字符串或超 2 000 字）。
+- 语义：
+  - **部分更新**：只改给出的字段，未出现的字段保持原值；`title` 会 trim，`tags` 会 trim 并**去重保持首次出现顺序**，`note` 原样保存（不 trim 内部换行，仅整体 trim 首尾）。
+  - `updatedAt` 每次成功更新都会推进，但 `createdAt` 不动。
+  - 空 `tags: []` 是合法值（表示清空标签）；空 `title: ""` 不合法（标题不允许被清空）。
+  - 更新后的会话仍可继续作答（`status` 不变），改名不会影响 `plan`/`turns`。
+- 幂等：是（同样的 patch 连打两次结果一致，只有 `updatedAt` 变化）。
+
+### 2.3 `Session` v2 结构（v0.2 B2 目标，B1 先落字段）
+
+```
+schemaVersion: 2
+title: string        // session/create 时自动生成，如「Java 后端 · 11-23 14:05」；可用 session/update 改
+tags: string[]       // 用户自定义，参与 session/list 的 query/tag 筛选
+note: string         // 复盘备注，只在 session/get 里返回全文
+```
 
 
 导出目录的判定（2026-11-23 修订，`TC-REP-004`/`TC-EDG-042` 守护）：

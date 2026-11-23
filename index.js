@@ -22,6 +22,7 @@ import { decideProbe } from './lib/director.mjs'
 import { ContractError, isContractError } from './lib/errors.mjs'
 import { extractProfile } from './lib/profile.mjs'
 import { buildReport, exportReport } from './lib/report.mjs'
+import { defaultTitle, listSessions, pickPatch, sessionMeta } from './lib/history.mjs'
 import { buildPlan } from './lib/session.mjs'
 import { scoreAnswer } from './lib/scorer.mjs'
 import { createStore } from './lib/store.mjs'
@@ -54,6 +55,25 @@ function resolveStore(deps) {
   if (deps.store !== undefined) return deps.store
   const home = deps.home ?? process.env.DSH_HOME
   return createStore({ home })
+}
+
+/**
+ * `session/update` answers with the record's own view (§3.11): the list summary
+ * plus the note and both timestamps, so the client can refresh in place.
+ */
+function sessionDetailMeta(session) {
+  const turns = Array.isArray(session.turns) ? session.turns : []
+  const scored = turns.map((turn) => turn?.score?.overall).filter((value) => typeof value === 'number')
+  return {
+    ...sessionMeta({ ...session, turns: turns.length, overall: scored.length === 0 ? null : mean1(scored) }),
+    note: session.note ?? '',
+    createdAt: session.createdAt ?? 0,
+    updatedAt: session.updatedAt ?? 0,
+  }
+}
+
+function mean1(values) {
+  return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10
 }
 
 /**
@@ -152,6 +172,9 @@ export async function dispatch(request, deps = {}) {
         const session = {
           schemaVersion: SCHEMA_VERSION,
           id: globalThis.crypto.randomUUID(),
+          title: defaultTitle({ profile: body.profile, createdAt: at }),
+          tags: [],
+          note: '',
           createdAt: at,
           updatedAt: at,
           status: 'active',
@@ -172,16 +195,49 @@ export async function dispatch(request, deps = {}) {
       }
 
       case 'session/list': {
-        const limit = body.limit === undefined ? 20 : body.limit
-        if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-          return fail('E_BAD_REQUEST', 'limit 必须是 1–100 的整数')
-        }
-        const sessions = (await resolveStore(deps).list()).slice(0, limit)
-        return ok({ sessions })
+        const store = resolveStore(deps)
+        const rows = await store.list()
+        return ok(
+          listSessions(rows, {
+            limit: body.limit,
+            offset: body.offset,
+            query: body.query,
+            status: body.status,
+            mode: body.mode,
+            difficulty: body.difficulty,
+            tag: body.tag,
+            sort: body.sort,
+          }),
+        )
+      }
+
+      case 'session/update': {
+        const patch = pickPatch(body)
+        const session = await resolveStore(deps).update(body.sessionId, patch)
+        return ok({ session: sessionDetailMeta(session) })
       }
 
       case 'session/delete': {
-        return ok(await resolveStore(deps).remove(body.sessionId))
+        const store = resolveStore(deps)
+        const hasIds = body.ids !== undefined
+        const hasOne = body.sessionId !== undefined
+
+        if (hasIds && hasOne) {
+          return fail('E_BAD_REQUEST', 'sessionId 与 ids 只能给一个')
+        }
+        if (!hasIds && !hasOne) {
+          return fail('E_BAD_REQUEST', '必须给出 sessionId 或 ids')
+        }
+        if (hasIds) {
+          if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== 'string' || id === '')) {
+            return fail('E_BAD_REQUEST', 'ids 必须是非空字符串数组')
+          }
+          if (body.ids.length > LIMITS.maxBatchDelete) {
+            return fail('E_BAD_REQUEST', `一次最多删除 ${LIMITS.maxBatchDelete} 条`)
+          }
+          return ok(await store.removeMany([...new Set(body.ids)]))
+        }
+        return ok(await store.remove(body.sessionId))
       }
 
       case 'session/finish': {
