@@ -95,6 +95,31 @@ window.__ModuleLoader__.load({
         'report.sample': '样本不足：少于 3 题，结论仅供参考',
         'error.prefix': '出错了',
         'busy.hint': '正在等模型，通常 3–10 秒',
+        'records.open': '我的记录',
+        'records.back': '返回面试',
+        'records.title': '面试记录',
+        'records.search': '搜索标题 / 标签 / 备注',
+        'records.ph': '例如 Redis、订单中心',
+        'records.empty': '还没有记录：先面一场，这里会留下可回顾的档案',
+        'records.status.all': '全部',
+        'records.status.active': '未完成',
+        'records.status.finished': '已完成',
+        'records.count': '共 {total} 条',
+        'records.continue': '继续',
+        'records.view': '查看报告',
+        'records.rename': '改名/标签',
+        'records.delete': '删除',
+        'records.deleteSelected': '删除选中',
+        'records.selected': '已选 {n} 条',
+        'records.title.label': '标题',
+        'records.tags.label': '标签（逗号分隔）',
+        'records.note.label': '复盘备注',
+        'records.save': '保存',
+        'records.cancel': '取消',
+        'records.saved': '已保存',
+        'records.deleted': '已删除 {n} 条',
+        'records.score': '得分',
+        'records.turns': '{n} 题',
       },
       en: {
         'icon.label': 'Mock interview',
@@ -119,6 +144,31 @@ window.__ModuleLoader__.load({
         'report.title': 'Report',
         'report.export': 'Export Markdown',
         'report.again': 'Run another',
+        'records.open': 'My records',
+        'records.back': 'Back to interview',
+        'records.title': 'Interview records',
+        'records.search': 'Search title / tags / note',
+        'records.ph': 'e.g. Redis, order service',
+        'records.empty': 'No records yet — run an interview and it lands here',
+        'records.status.all': 'All',
+        'records.status.active': 'Unfinished',
+        'records.status.finished': 'Finished',
+        'records.count': '{total} records',
+        'records.continue': 'Resume',
+        'records.view': 'Open report',
+        'records.rename': 'Rename / tag',
+        'records.delete': 'Delete',
+        'records.deleteSelected': 'Delete selected',
+        'records.selected': '{n} selected',
+        'records.title.label': 'Title',
+        'records.tags.label': 'Tags (comma separated)',
+        'records.note.label': 'Review note',
+        'records.save': 'Save',
+        'records.cancel': 'Cancel',
+        'records.saved': 'Saved',
+        'records.deleted': 'Deleted {n}',
+        'records.score': 'Score',
+        'records.turns': '{n} questions',
       },
     }
 
@@ -456,6 +506,13 @@ window.__ModuleLoader__.load({
       const [report, setReport] = useState(null)
       const [exportPath, setExportPath] = useState('')
       const [exportDir, setExportDir] = useState('')
+      const [records, setRecords] = useState([])
+      const [recordsTotal, setRecordsTotal] = useState(0)
+      const [recordQuery, setRecordQuery] = useState('')
+      const [recordStatus, setRecordStatus] = useState('')
+      const [selected, setSelected] = useState([])
+      const [editing, setEditing] = useState(null)
+      const [recordMsg, setRecordMsg] = useState('')
 
       const items = session?.plan?.items ?? []
       const item = items[index]
@@ -577,6 +634,114 @@ window.__ModuleLoader__.load({
         })
       }, [session, exportDir, onError])
 
+      const recordsBody = (next = {}) => {
+        const query = next.query === undefined ? recordQuery : next.query
+        const status = next.status === undefined ? recordStatus : next.status
+        const body = { limit: 50 }
+        if (typeof query === 'string' && query.trim() !== '') body.query = query.trim()
+        if (status !== '') body.status = status
+        return body
+      }
+
+      const loadRecords = useCallback((next = {}) => {
+        setBusy(true)
+        setError('')
+        setRecordMsg('')
+        rpc('session/list', recordsBody(next)).then((result) => {
+          setBusy(false)
+          if (!result.ok) return onError(result)
+          setRecords(result.value.sessions ?? [])
+          setRecordsTotal(result.value.total ?? 0)
+          setSelected([])
+        })
+      }, [recordQuery, recordStatus, onError])
+
+      const openRecords = useCallback(() => {
+        setPhase('records')
+        loadRecords()
+      }, [loadRecords])
+
+      const openRecord = useCallback((record) => {
+        setBusy(true)
+        setError('')
+        rpc('session/get', { sessionId: record.id }).then((result) => {
+          setBusy(false)
+          if (!result.ok) return onError(result)
+          const stored = result.value.session
+          const items = stored.plan?.items ?? []
+          const answered = new Set((stored.turns ?? []).map((turn) => turn.questionId))
+          const next = items.findIndex((entry) => !answered.has(entry.id))
+          setSession({ sessionId: stored.id, plan: stored.plan, status: stored.status, title: stored.title })
+          setIndex(next < 0 ? Math.max(0, items.length - 1) : next)
+          setCard(null)
+          setCases([])
+          setProbe('')
+          setAnswer('')
+          setCodeText('')
+          setPhase(stored.status === 'finished' ? 'records' : 'run')
+          setRecordMsg(stored.status === 'finished' ? t('records.view') : '')
+        })
+      }, [onError, t])
+
+      const openReport = useCallback((record) => {
+        setBusy(true)
+        setError('')
+        rpc('session/finish', { sessionId: record.id }).then((result) => {
+          setBusy(false)
+          if (!result.ok) return onError(result)
+          setSession({ sessionId: record.id, plan: [], status: 'finished', title: record.title })
+          setReport(result.value.report)
+          setExportPath('')
+          setPhase('report')
+        })
+      }, [onError])
+
+      const saveEdit = useCallback(() => {
+        if (editing === null) return
+        setBusy(true)
+        setError('')
+        const tags = editing.tagsText
+          .split(/[,，;；\n]/)
+          .map((entry) => entry.trim())
+          .filter((entry) => entry !== '')
+        const body = { sessionId: editing.id, title: editing.title, tags, note: editing.note }
+        rpc('session/update', body).then((result) => {
+          setBusy(false)
+          if (!result.ok) return onError(result)
+          const saved = result.value.session
+          setRecords((list) => list.map((row) => (row.id === saved.id ? { ...row, title: saved.title, tags: saved.tags } : row)))
+          setEditing(null)
+          setRecordMsg(t('records.saved'))
+        })
+      }, [editing, onError, t])
+
+      const removeOne = useCallback((record) => {
+        const ask = typeof window !== 'undefined' && typeof window.confirm === 'function'
+        if (ask && !window.confirm(`${t('records.delete')}「${record.title}」？`)) return
+        setBusy(true)
+        setError('')
+        rpc('session/delete', { sessionId: record.id }).then((result) => {
+          setBusy(false)
+          if (!result.ok) return onError(result)
+          setRecordMsg(t('records.deleted').replace('{n}', '1'))
+          loadRecords()
+        })
+      }, [loadRecords, onError, t])
+
+      const removeSelected = useCallback(() => {
+        if (selected.length === 0) return
+        const ask = typeof window !== 'undefined' && typeof window.confirm === 'function'
+        if (ask && !window.confirm(`${t('records.deleteSelected')} ${selected.length}？`)) return
+        setBusy(true)
+        setError('')
+        rpc('session/delete', { ids: selected }).then((result) => {
+          setBusy(false)
+          if (!result.ok) return onError(result)
+          setRecordMsg(t('records.deleted').replace('{n}', String(result.value.deleted ?? 0)))
+          loadRecords()
+        })
+      }, [loadRecords, onError, selected, t])
+
       const speak = useCallback(() => {
         const text = item?.topic ?? ''
         const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined
@@ -591,6 +756,120 @@ window.__ModuleLoader__.load({
         setError(t('run.voice.blocked'))
       }, [t])
 
+      if (phase === 'records') {
+        const statusOptions = [
+          { value: '', label: t('records.status.all') },
+          { value: 'active', label: t('records.status.active') },
+          { value: 'finished', label: t('records.status.finished') },
+        ]
+        return h(
+          'div',
+          { style: styles.page },
+          h('div', { style: styles.head },
+            h('h1', { style: styles.title }, t('records.title')),
+            h('span', { style: styles.badge }, t('records.count').replace('{total}', String(recordsTotal))),
+            h('button', { type: 'button', style: styles.button, onClick: () => setPhase('setup') }, t('records.back')),
+          ),
+          h('div', { style: styles.card },
+            h('div', { style: styles.row },
+              h('input', {
+                style: { ...styles.input, flex: '1 1 220px' },
+                value: recordQuery,
+                placeholder: t('records.ph'),
+                onChange: (event) => setRecordQuery(event.target.value),
+                onKeyDown: (event) => {
+                  if (event.key === 'Enter') loadRecords()
+                },
+              }),
+              h(Choice, {
+                label: t('records.status.all'),
+                value: recordStatus,
+                options: statusOptions,
+                onChange: (value) => {
+                  setRecordStatus(value)
+                  loadRecords({ status: value })
+                },
+              }),
+              h('button', { type: 'button', style: busy ? styles.primaryOff : styles.primary, onClick: () => loadRecords(), disabled: busy },
+                t('records.search')),
+            ),
+            records.length === 0
+              ? h('p', { style: { ...styles.subtitle, marginTop: '12px' } }, t('records.empty'))
+              : h('div', { style: { marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' } },
+                  records.map((record) =>
+                    h('div', { key: record.id, style: styles.card },
+                      h('div', { style: styles.row },
+                        h('input', {
+                          type: 'checkbox',
+                          checked: selected.includes(record.id),
+                          onChange: (event) => {
+                            setSelected(event.target.checked
+                              ? [...selected, record.id]
+                              : selected.filter((id) => id !== record.id))
+                          },
+                        }),
+                        h('strong', { style: { fontSize: '14px', flex: '1 1 200px' } }, record.title),
+                        h('span', { style: styles.meta },
+                          `${record.mode} · ${record.difficulty} · ${t('records.turns').replace('{n}', String(record.turns))}`),
+                        h('span', { style: record.overall === null ? styles.meta : styles.badge },
+                          record.overall === null ? '–' : `${t('records.score')} ${record.overall}`),
+                        record.tags.length > 0 ? h('span', { style: styles.meta }, record.tags.join(' / ')) : null,
+                      ),
+                      h('div', { style: { ...styles.row, marginTop: '8px' } },
+                        record.status === 'finished'
+                          ? h('button', { type: 'button', style: styles.button, onClick: () => openReport(record) }, t('records.view'))
+                          : h('button', { type: 'button', style: styles.button, onClick: () => openRecord(record) }, t('records.continue')),
+                        record.status !== 'finished'
+                          ? h('button', { type: 'button', style: styles.button, onClick: () => openRecord(record) }, t('records.view'))
+                          : null,
+                        h('button', {
+                          type: 'button',
+                          style: styles.button,
+                          onClick: () => setEditing({ id: record.id, title: record.title, tagsText: record.tags.join('，'), note: '' }),
+                        }, t('records.rename')),
+                        h('button', { type: 'button', style: styles.button, onClick: () => removeOne(record) }, t('records.delete')),
+                      ),
+                      editing !== null && editing.id === record.id
+                        ? h('div', { style: { marginTop: '10px' } },
+                            h(Field, { label: t('records.title.label') },
+                              h('input', {
+                                style: styles.input,
+                                value: editing.title,
+                                onChange: (event) => setEditing({ ...editing, title: event.target.value }),
+                              })),
+                            h(Field, { label: t('records.tags.label') },
+                              h('input', {
+                                style: styles.input,
+                                value: editing.tagsText,
+                                placeholder: t('records.ph'),
+                                onChange: (event) => setEditing({ ...editing, tagsText: event.target.value }),
+                              })),
+                            h(Field, { label: t('records.note.label') },
+                              h('textarea', {
+                                style: { ...styles.input, minHeight: '70px' },
+                                value: editing.note,
+                                onChange: (event) => setEditing({ ...editing, note: event.target.value }),
+                              })),
+                            h('div', { style: styles.row },
+                              h('button', { type: 'button', style: busy ? styles.primaryOff : styles.primary, onClick: saveEdit, disabled: busy }, t('records.save')),
+                              h('button', { type: 'button', style: styles.button, onClick: () => setEditing(null) }, t('records.cancel')),
+                            ))
+                        : null,
+                    ),
+                  ),
+                ),
+            selected.length > 0
+              ? h('div', { style: { ...styles.row, marginTop: '12px' } },
+                  h('span', { style: styles.meta }, t('records.selected').replace('{n}', String(selected.length))),
+                  h('button', { type: 'button', style: styles.button, onClick: removeSelected }, t('records.deleteSelected')),
+                )
+              : null,
+            recordMsg !== '' ? h('div', { style: styles.ok }, recordMsg) : null,
+            error !== '' ? h('div', { style: styles.bad }, error) : null,
+          ),
+        )
+      }
+
       if (phase === 'setup') {
         return h(
           'div',
@@ -598,6 +877,7 @@ window.__ModuleLoader__.load({
           h('div', { style: styles.head },
             h('h1', { style: styles.title }, t('panel.title')),
             h('span', { style: styles.badge }, setup.mode),
+            h('button', { type: 'button', style: styles.button, onClick: openRecords }, t('records.open')),
           ),
           h('p', { style: styles.subtitle }, t('panel.subtitle')),
           h('div', { style: styles.card },

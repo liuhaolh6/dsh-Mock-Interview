@@ -324,6 +324,34 @@ RPC 跑在 Web 服务进程里，**不继承启动它的 shell 的环境变量**
 
 ACTIONS 十项全部有实现；UI 侧不重复计算分数，只渲染宿主给的 score/report（契约 §2.1 规定）。
 
+### B1 面试记录增删改查（v0.2，2026-11-23）
+
+本轮的对象是「面试记录」本身：新建（已有）、查看、改名/标签/备注、搜索筛选、单条与批量删除、从未完成记录继续作答。契约 §3.5 / §3.10 / §3.11。
+
+| 用例 | 层 | 场景 | 状态 |
+|---|---|---|---|
+| TC-HIS-001 | U | 空 patch 被拒绝，不会静默写一次「什么都没改」的更新 | ✅ |
+| TC-HIS-002 | U | 标题 trim、非空、≤80 字；空串与超长拒绝 | ✅ |
+| TC-HIS-003 | U | 标签 trim、按首次出现去重保序、≤10 个、单项 ≤24 字、允许空数组 | ✅ |
+| TC-HIS-004 | U | 备注首尾 trim、保留内部换行、≤2 000 字、非字符串拒绝 | ✅ |
+| TC-HIS-005 | U | query 不区分大小写，覆盖标题/标签/备注/模式/难度；与 status/mode/difficulty/tag 是 AND | ✅ |
+| TC-HIS-006 | U | 排序 recent/oldest/score（无分排最后）；分页 offset/limit、total、hasMore；非法 sort/status/offset 拒绝 | ✅ |
+| TC-HIS-007 | U | 列表摘要不含 note 与 updatedAt（排序键不外泄） | ✅ |
+| TC-HIS-100 | I | 新建记录自动生成标题，tags/note 默认值齐备，列表带同一标题 | ✅ |
+| TC-HIS-101 | I | 改名不动 plan/turns/createdAt，updatedAt 前进；标签与备注可单独更新（部分更新） | ✅ |
+| TC-HIS-102 | I | 六种非法 patch 与未知记录分别返回 E_BAD_REQUEST / E_SESSION_NOT_FOUND | ✅ |
+| TC-HIS-103 | I | 列表按 query/tag/mode/difficulty 筛选与分页；非法枚举拒绝 | ✅ |
+| TC-HIS-104 | I | 单条删除幂等；批量删除返回实际条数；重复批量返回 0；51 条 / 非字符串 / 同时给 id 与 ids 均拒绝 | ✅ |
+| TC-HIS-105 | I | 未完成记录可继续：改名后 turns 不新增幻影条目，重答同题覆盖而非追加 | ✅ |
+
+本轮证据：`npm test` 132/132、`npm run e2e` 6/6、`npm run lint` 0 error、coverage 行 98.82% / 分支 87.22%（`lib/history.mjs` 行 100%、分支 91.96%）。
+
+实现要点（记录用）：
+- 排序键 `updatedAt` 只在 store 内部参与排序，`sessionMeta()` 出口剥掉它和 `note`，列表不会把整份复盘带出去。
+- `score` 排序里「没有分数」不是 0 分：`null` 一律排最后，彼此按时间倒序。
+- 批量删除先用一次 `readdir` 求交集再逐个 `rm`，既保证「只报真实删掉的条数」，又避免 N 次 stat。
+- 旧记录（v0.1 写的文件没有 title/tags/note）在 `store.get` 里补默认值，下次写入时落盘——真正的 `schemaVersion` 迁移放在 B2。
+
 ### S7 返修（2026-11-23，真机点验后）
 
 | 用例 | 层 | 场景 | 状态 |
