@@ -25,6 +25,7 @@ import { extractProfile } from './lib/profile.mjs'
 import { buildReport, exportReport } from './lib/report.mjs'
 import { defaultTitle, listSessions, pickPatch, sessionMeta } from './lib/history.mjs'
 import { progressOf, statsOf, trendOf } from './lib/insights.mjs'
+import { emptyReasonFor, readinessOf } from './lib/onboarding.mjs'
 import { buildPlan } from './lib/session.mjs'
 import { scoreAnswer } from './lib/scorer.mjs'
 import { createStore } from './lib/store.mjs'
@@ -117,7 +118,9 @@ export async function dispatch(request, deps = {}) {
           { resumeText: body.resumeText, jdText: body.jdText, jd: body.jd },
           { complete: deps.complete },
         )
-        return ok({ profile, warnings })
+        // Readiness travels with the profile so the confirm screen can say
+        // which half is thin instead of silently disabling the start button.
+        return ok({ profile, warnings, readiness: readinessOf(profile) })
       }
 
       case 'code/review': {
@@ -214,7 +217,16 @@ export async function dispatch(request, deps = {}) {
         })
         // Aggregates describe the whole filtered list, not just this page, so the
         // stats strip does not jump when the user pages through records.
-        return ok({ ...page, stats: statsOf(rows), trend: trendOf(rows) })
+        return ok({
+          ...page,
+          stats: statsOf(rows),
+          trend: trendOf(rows),
+          emptyReason: emptyReasonFor({
+            allCount: rows.length,
+            pageCount: page.sessions.length,
+            filtered: Boolean(body.query || body.status || body.mode || body.difficulty || body.tag),
+          }),
+        })
       }
 
       case 'session/update': {

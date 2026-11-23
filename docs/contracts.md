@@ -347,6 +347,14 @@ note: string         // 复盘备注，只在 session/get 里返回全文
 - `trend`：最近 10 场有分数的会话，按时间**从旧到新**，供记录页的趋势条使用。
 - 这三个字段都是**只读派生值**，不落盘，不进 `Session` 结构。
 
+### 3.13 空态与可开始性（v0.3 C3）
+
+面板不猜「为什么这里是空的」，两个判定都在宿主算：
+
+- `session/list` 的响应多一个 `emptyReason`：`'none'` = 从来没存过面试；`'filtered'` = 有记录但当前筛选/分页没有命中；有行时为 `null`。
+- `profile/extract` 的响应多一个 `readiness`：`{ ready, blockers }`，`blockers` ⊆ `['skills','projects']`。技能与项目都空时 `ready:false`；只有一个也算可开始（题目会退到题库）。
+- 确认页的主按钮以`用户将要提交的那两个输入框`为准（`skillsText`/`projectsText` 任一非空）。宿主给的 `readiness` 只用于解释「哪里还薄」，不覆盖用户的编辑。
+
 ## 4. 错误码全表
 
 | code | 触发 | 可重试 | 前端表现 |

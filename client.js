@@ -100,6 +100,12 @@ window.__ModuleLoader__.load({
         'busy.hint': '正在等模型，通常 3–10 秒',
         'records.open': '我的记录',
         'records.back': '返回面试',
+        'records.empty.start': '还没有面试记录。先面一场 15 分钟的，结束后这里会自动生成可回顾的档案。',
+        'records.empty.cta': '开始新面试',
+        'records.filtered': '没有匹配这个筛选条件的记录。',
+        'records.filtered.cta': '清空筛选',
+        'confirm.blocked': '至少填一项技能或一个项目，否则没法出题。',
+        'confirm.readiness.ready': '画像完整，可以直接开始。',
         'records.title': '面试记录',
         'records.search': '搜索标题 / 标签 / 备注',
         'records.ph': '例如 Redis、订单中心',
@@ -156,6 +162,12 @@ window.__ModuleLoader__.load({
         'report.again': 'Run another',
         'records.open': 'My records',
         'records.back': 'Back to interview',
+        'records.empty.start': 'No interviews yet. Run a 15-minute one and a reviewable record lands here.',
+        'records.empty.cta': 'Start an interview',
+        'records.filtered': 'No records match this filter.',
+        'records.filtered.cta': 'Clear filters',
+        'confirm.blocked': 'Add at least one skill or one project, otherwise there is nothing to ask about.',
+        'confirm.readiness.ready': 'Profile looks complete — ready to start.',
         'records.title': 'Interview records',
         'records.search': 'Search title / tags / note',
         'records.ph': 'e.g. Redis, order service',
@@ -561,6 +573,7 @@ window.__ModuleLoader__.load({
       const [exportFormat, setExportFormat] = useState('md')
       const [records, setRecords] = useState([])
       const [recordsTotal, setRecordsTotal] = useState(0)
+      const [recordsEmpty, setRecordsEmpty] = useState(null)
       const [recordsStats, setRecordsStats] = useState(null)
       const [recordsTrend, setRecordsTrend] = useState([])
       // Ticking clock for "how long have I been in this interview"; the host
@@ -743,6 +756,7 @@ window.__ModuleLoader__.load({
           setRecords(result.value.sessions ?? [])
           setRecordsTotal(result.value.total ?? 0)
           setRecordsStats(result.value.stats ?? null)
+          setRecordsEmpty(result.value.emptyReason ?? null)
           setRecordsTrend(result.value.trend ?? [])
           setSelected([])
         })
@@ -908,7 +922,22 @@ window.__ModuleLoader__.load({
                 t('records.search')),
             ),
             records.length === 0
-              ? h('p', { style: { ...styles.subtitle, marginTop: '12px' } }, t('records.empty'))
+              ? h('div', { style: { ...styles.card, marginTop: '12px' } },
+                  recordsEmpty === 'none'
+                    ? h('div', null,
+                        h('p', { style: { ...styles.subtitle, marginTop: 0 } }, t('records.empty.start')),
+                        h('button', { type: 'button', style: styles.primary, onClick: reset }, t('records.empty.cta')))
+                    : h('div', null,
+                        h('p', { style: { ...styles.subtitle, marginTop: 0 } }, t('records.filtered')),
+                        h('button', {
+                          type: 'button',
+                          style: styles.button,
+                          onClick: () => {
+                            setRecordQuery('')
+                            setRecordStatus('')
+                            loadRecords({ query: '', status: '' })
+                          },
+                        }, t('records.filtered.cta'))))
               : h('div', { style: { marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' } },
                   records.map((record) =>
                     h('div', { key: record.id, style: styles.card },
@@ -1045,6 +1074,8 @@ window.__ModuleLoader__.load({
         )
       }
 
+      const canStart = skillsText.trim() !== '' || projectsText.trim() !== ''
+
       if (phase === 'confirm') {
         return h(
           'div',
@@ -1068,8 +1099,16 @@ window.__ModuleLoader__.load({
                   h('div', { style: styles.label }, t('confirm.warnings')),
                   h('ul', { style: styles.list }, warnings.map((warning, i) => h('li', { key: i }, warning))))
               : null,
+            canStart
+              ? h('p', { style: { ...styles.subtitle, marginTop: '10px' } }, t('confirm.readiness.ready'))
+              : h('p', { style: styles.bad }, t('confirm.blocked')),
             h('div', { style: { ...styles.row, marginTop: '14px' } },
-              h('button', { type: 'button', style: busy ? styles.primaryOff : styles.primary, onClick: start, disabled: busy }, t('confirm.start')),
+              h('button', {
+                type: 'button',
+                style: busy || !canStart ? styles.primaryOff : styles.primary,
+                onClick: start,
+                disabled: busy || !canStart,
+              }, t('confirm.start')),
               h('button', { type: 'button', style: styles.button, onClick: () => setPhase('setup') }, t('confirm.back')),
             ),
             error !== '' ? h('div', { style: styles.bad }, error) : null,

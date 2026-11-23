@@ -435,3 +435,18 @@ ACTIONS 十项全部有实现；UI 侧不重复计算分数，只渲染宿主给
 | TC-INS-010 | I | `session/get` | 带 `progress`，total/index/elapsedMs 正确 |
 | TC-INS-011 | I | `session/list` | `stats` 与自身 rows 一致、`trend` 含刚作答的会话 |
 
+### C3 空态与单主动作（v0.3）
+
+| ID | 层级 | 场景 | 断言 |
+|---|---|---|---|
+| TC-ONB-001 | U | 空库 | `emptyReasonFor` 返回 `'none'` |
+| TC-ONB-002 | U | 有记录但无命中 | 返回 `'filtered'` |
+| TC-ONB-003 | U | 有行 | 返回 `null` |
+| TC-ONB-004 | U | 画像全空 | `ready:false`、blockers 为 skills+projects |
+| TC-ONB-005 | U | 只有技能 | `ready:true`、blockers 只剩 projects |
+| TC-ONB-006 | U | 畸形画像 | 不抛异常，按不可开始处理 |
+| TC-ONB-010 | I | `session/list` | 空库 `'none'`、有记录 `null`、无命中 `'filtered'` 且 stats 仍按全量 |
+| TC-ONB-011 | I | `profile/extract` | 响应带 `readiness`，技能缺项目时为 blockers=['projects'] |
+
+> 诚实记录：`lib/onboarding.mjs` 的用例与实现是同一步写入并一起跑绿的，没留下失败快照；集成两条是「先跑红（`emptyReason` 为 undefined）→ 修夹具与接线 → 绿」。
+
