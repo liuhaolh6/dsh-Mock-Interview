@@ -112,3 +112,16 @@ test('TC-UX-012 the setup screen offers the speech-to-text endpoint form', () =>
   assert.match(text, /asr\.apiKey/, 'expected the key field')
   assert.match(text, /asr\.save/, 'expected the save button')
 })
+
+test('TC-UX-013 the setup screen offers the custom question bank form', () => {
+  const slots = loadPanel()
+  const page = slots.find((entry) => entry.options.name === 'main').component
+  const tree = page({ ctx: { get: () => undefined }, t: (key) => key })
+  const text = textOf(tree)
+  // D4: the bank is pasted here, validated by the host, and stored under DSH_HOME.
+  assert.match(text, /bank\.title/, 'expected the custom bank section')
+  assert.match(text, /bank\.hint/, 'expected the format hint')
+  assert.match(text, /bank\.check/, 'expected the check button')
+  assert.match(text, /bank\.save/, 'expected the save button')
+  assert.match(text, /bank\.reset/, 'expected the reset button')
+})

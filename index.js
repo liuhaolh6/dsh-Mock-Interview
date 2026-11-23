@@ -45,13 +45,20 @@ import { progressOf, statsOf, trendOf } from './lib/insights.mjs'
 import { emptyReasonFor, readinessOf } from './lib/onboarding.mjs'
 import { pickTheme } from './lib/theme.mjs'
 import { buildPlan } from './lib/session.mjs'
+import {
+  customBankInfo,
+  removeCustomBank,
+  resolveBank,
+  validateBank,
+  writeCustomBank,
+} from './lib/bank.mjs'
 import { scoreAnswer } from './lib/scorer.mjs'
 import { createStore } from './lib/store.mjs'
 
 export const name = 'dsh-mock-interview'
 export const inject = []
 
-export const VERSION = '0.3.0'
+export const VERSION = '0.4.0'
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -265,13 +272,13 @@ export async function dispatch(request, deps = {}) {
         const difficulty = body.difficulty ?? source?.difficulty
         const minutes = body.minutes ?? source?.minutes
         const avoid = source === null ? undefined : (source.plan?.items ?? []).map((item) => item?.target)
-        const plan = await buildPlan({
-          profile,
-          mode,
-          difficulty,
-          minutes,
-          ...(avoid === undefined ? {} : { avoid }),
-        })
+        // A custom bank under $DSH_HOME wins over the packaged one (D4), so the
+        // candidate's own questions are what the run actually asks. `home` is a
+        // dependency of the planner (second argument), not part of the input.
+        const plan = await buildPlan(
+          { profile, mode, difficulty, minutes, ...(avoid === undefined ? {} : { avoid }) },
+          resolveHome(deps) === undefined ? {} : { home: resolveHome(deps) },
+        )
         const at = now()
         const session = {
           schemaVersion: SCHEMA_VERSION,
@@ -291,6 +298,36 @@ export async function dispatch(request, deps = {}) {
         }
         await resolveStore(deps).put(session)
         return ok({ sessionId: session.id, plan })
+      }
+
+      // v0.4 / D4 custom bank. The panel pastes JSON; the host owns validation,
+      // storage and the fallback, so a bad file can never take the run down.
+      case 'bank/validate': {
+        const checked = validateBank(body.bank)
+        return ok(bankSummary(checked))
+      }
+
+      case 'bank/save': {
+        const saved = await writeCustomBank({ home: resolveHome(deps), bank: body.bank })
+        return ok({ ...bankSummary({ topics: [], warnings: saved.warnings }), path: saved.path, count: saved.count })
+      }
+
+      case 'bank/get': {
+        const home = resolveHome(deps)
+        const active = await resolveBank({ home })
+        return ok({
+          custom: await customBankInfo({ home }),
+          active: {
+            source: active.source,
+            count: active.topics.length,
+            ...(active.warning === undefined ? {} : { warning: active.warning }),
+          },
+        })
+      }
+
+      case 'bank/reset': {
+        const removed = await removeCustomBank({ home: resolveHome(deps) })
+        return ok({ removed })
       }
 
       case 'session/get': {
@@ -787,6 +824,17 @@ export function apply(ctx) {
       'dsh-mock-interview: interview api',
     )
   })
+}
+
+/** Counts per kind for the bank screens; `warnings` explains anything dropped. */
+function bankSummary(checked) {
+  const kinds = { skill: 0, project: 0, behavior: 0, code: 0 }
+  for (const entry of checked.topics ?? []) kinds[entry.kind] = (kinds[entry.kind] ?? 0) + 1
+  return {
+    count: (checked.topics ?? []).length,
+    kinds,
+    warnings: checked.warnings ?? [],
+  }
 }
 
 export { handle, RPC_PATH, SCHEMA_VERSION }

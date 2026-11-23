@@ -324,6 +324,21 @@ S2 收口时分支覆盖率只有 **77.78%**（`director.mjs` 50%、`scorer.mjs`
 | TC-COD-206 | U | AC-6 | 未知语言仍可评审 | `elixir` → `language==='generic'`、`warnings` 含 `elixir`、`executed===false` |
 | TC-EDG-018 | U | AC-6 | 份数截断 + 缺省语言（**契约变更**） | 模型给 7 条 → 截断为 5；不给 `language` 时 `language==='generic'` 且提示词用通用检查点（原断言为字面量 `unknown`） |
 
+### D4 自定义题库（v0.4）
+
+| 用例 ID | 层级 | 对应 AC | 场景 | 期望 |
+| --- | --- | --- | --- | --- |
+| TC-BNK-201 | U | AC-2 | 合法题库校验 | 顺序、`kind`、`keywords` 原样保留，`warnings` 为空 |
+| TC-BNK-202 | U | AC-2 | 文档级错误 | 非对象 / 缺 `topics` / `topics: []` / `topics` 非数组 → `E_BAD_REQUEST` 且文案点名问题 |
+| TC-BNK-203 | U | AC-2 | 条目级错误 | 缺 `topic`、`kind: 'essay'`、`topic` 超长 → 文案含「第 N 条」；非法关键字丢弃并 warning，合法保留 |
+| TC-BNK-204 | U | AC-2 | 超量 | 200 条 → `E_BAD_REQUEST`，文案含上限 120（不静默截断） |
+| TC-BNK-205 | U | AC-2 | 落盘与回退 | 写读往返、`resolveBank` 优先自定义、手工改坏 → `source:'default'` + `warning`、`removeCustomBank` 幂等 |
+| TC-BNK-206 | U | AC-2 | 先校验后写 | 坏题库 `writeCustomBank` 抛 `E_BAD_REQUEST` 且磁盘无文件 |
+| TC-BNK-210 | I | AC-2 | 保存后出题 | `bank/save` → `bank/get` 显示 custom → `session/create` 的 `plan.bankSource==='custom'`、题面含自定义题目、最后一道仍是 `kind:'code'`；`bank/reset` 后回内置 |
+| TC-BNK-211 | I | AC-2 | 坏题库两个入口都拒 | `bank/validate` 与 `bank/save` 都 `E_BAD_REQUEST`，`bank/get` 显示 `custom.exists === false` |
+| TC-BNK-212 | I | AC-2 | 坏文件不拦面试 | 手工改坏自定义题库后 `bank/get.active.source==='default'` 带 warning，`session/create` 仍成功且 `bankSource==='default'` |
+| TC-UX-013 | E | AC-2 | 面板入口 | setup 首屏出现 `bank.title/hint/check/save/reset` |
+
 ## 5. 执行与判定
 
 ```bash

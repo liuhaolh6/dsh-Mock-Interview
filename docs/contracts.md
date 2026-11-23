@@ -448,6 +448,24 @@ note: string         // 复盘备注，只在 session/get 里返回全文
 - 与 `report/export` 的区别：报告是给人看的复盘（Markdown/JSON 单场），整包是给机器用的备份（多场、可再导入）。
 - 幂等：否（每次写新文件）。
 
+### 3.18 自定义题库：`bank/validate` / `bank/save` / `bank/get` / `bank/reset`（v0.4 D4）
+
+四个动作共用一套题库文档格式与校验规则，校验失败的文案要点名**第几条、哪个字段**。
+
+- 文档格式：`{ "version": 1, "topics": [{ "id"?: "…", "topic": "题目", "kind": "skill|project|behavior|code", "keywords"?: ["…"] }] }`
+  - `topic` 必填，trim 后非空，≤ `LIMITS.maxBankTopicChars = 120` 字；
+  - `kind` 省略即 `skill`，只接受 `BANK_KINDS` 四项（`skill`/`project`/`behavior`/`code`），其余一律报错——拼写错不该被静默当成技能题；
+  - `keywords` 可省略，必须是字符串数组；非字符串/空白关键字**丢弃并 warning**，单条超过 `maxBankKeywordChars = 32` 也丢弃并 warning，超过 `maxBankKeywords = 12` 个则报错（不静默截断）；
+  - `id` 省略则按顺序补 `bank-N`；重复 id 自动加后缀并 warning；
+  - 条数 1..`LIMITS.maxBankTopics = 120`；0 条或超量都报错（不静默截断）。整个文档仍在 §1 的 64 KB 请求上限内。
+- `bank/validate`：请求 `{ "op": "bank/validate", "bank": { … } }` → `{ "count": 3, "kinds": { "skill": 1, "project": 1, "behavior": 0, "code": 1 }, "warnings": [] }`。**不落盘**，可反复调用；坏文档 → `E_BAD_REQUEST`。
+- `bank/save`：同样的请求体，先校验再**原子写**到 `$DSH_HOME/storages/dsh-mock-interview/bank.json`（临时文件 + `rename`，失败不留半个文件）→ `{ "count": 3, "kinds": {…}, "warnings": [], "path": "…", "count": 3 }`。坏文档 → `E_BAD_REQUEST` 且磁盘上什么都不变。
+- `bank/get`：无请求字段 → `{ "custom": { "exists": true, "path": "…", "count": 3, "updatedAt": 1795449598946 }, "active": { "source": "custom"|"default", "count": 3, "warning"?: "…" } }`。`exists:false` 时 `custom` 只有 `exists` 一个字段。**从不回传题库全文**（面板自己粘贴过，不必再取）。
+- `bank/reset`：无请求字段 → `{ "removed": true|false }`（删两次第二次为 `false`，幂等）。
+- **生效规则**：`session/create` 取题库的顺序是「显式路径（测试/部署）→ 自定义文件 → 内置 `data/bank.json`」；用了哪一份写在 `plan.bankSource` 上。手工改坏的自定义文件**不会拦住面试**：回退内置题库，并在 `plan.bankWarning` / `bank/get.active.warning` 里说明（坏文件是用户造成的，不该把整场面试弄崩）。
+- 与内置题库的区别：内置题库坏了是部署故障（`E_INTERNAL` + 路径），用户题库坏了是输入错误（`E_BAD_REQUEST` + 第几条）——两条路径不共用错误码。
+- 目录语义（D4 变更）：`buildPlan` 的题单改为**简历靶子与题库题交替**排布。原先「先把简历全问完再问题库」，在简历丰满时会把预算用光，自定义题库一道题都轮不上（TC-BNK-210 守护）。
+
 ## 4. 错误码全表
 
 | code | 触发 | 可重试 | 前端表现 |

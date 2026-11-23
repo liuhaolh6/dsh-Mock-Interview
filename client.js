@@ -102,6 +102,18 @@ const ARCHIVED_TAG = '已归档'
         'run.recording': '正在录音…点击结束',
         'run.transcribing': '转写中…',
         'asr.title': '语音转写设置（可选）',
+        'bank.title': '自定义题库（可选）',
+        'bank.hint': '粘贴一个 JSON：{ "topics": [{ "topic": "题目", "kind": "skill|project|behavior|code", "keywords": ["命中词"] }] }。校验通过后保存，新建面试就从这份题库出题。',
+        'bank.ph': '{ "topics": [{ "topic": "分布式事务 TCC", "kind": "skill", "keywords": ["分布式"] }] }',
+        'bank.check': '校验',
+        'bank.save': '保存并启用',
+        'bank.reset': '恢复内置题库',
+        'bank.checked': '校验通过：%s 题',
+        'bank.saved': '已保存并启用：%s 题',
+        'bank.reset.done': '已恢复内置题库',
+        'bank.active.custom': '当前：自定义题库（%s 题）',
+        'bank.active.default': '当前：内置题库（%s 题）',
+        'bank.invalid': '题库有问题，未保存',
         'asr.hint': '插件不录存音频：你说的一段只发给下面这个端点，拿到文字后立即丢弃。不配置就只用文字作答。',
         'asr.baseUrl': '端点地址（OpenAI 兼容，形如 https://host/v1）',
         'asr.model': '模型名（如 whisper-1）',
@@ -285,6 +297,18 @@ const ARCHIVED_TAG = '已归档'
         'run.recording': 'Recording… click to stop',
         'run.transcribing': 'Transcribing…',
         'asr.title': 'Speech-to-text settings (optional)',
+        'bank.title': 'Custom question bank (optional)',
+        'bank.hint': 'Paste JSON: { "topics": [{ "topic": "question", "kind": "skill|project|behavior|code", "keywords": ["match word"] }] }. Save it and the next run draws from it.',
+        'bank.ph': '{ "topics": [{ "topic": "Distributed transaction TCC", "kind": "skill", "keywords": ["distributed"] }] }',
+        'bank.check': 'Check',
+        'bank.save': 'Save and use',
+        'bank.reset': 'Back to built-in',
+        'bank.checked': 'Looks valid: %s question(s)',
+        'bank.saved': 'Saved and in use: %s question(s)',
+        'bank.reset.done': 'Built-in bank restored',
+        'bank.active.custom': 'In use: custom bank (%s questions)',
+        'bank.active.default': 'In use: built-in bank (%s questions)',
+        'bank.invalid': 'The bank has a problem, nothing saved',
         'asr.hint': 'No audio is recorded or stored: one clip goes to the endpoint below and is dropped as soon as text comes back. Leave it empty to answer by typing only.',
         'asr.baseUrl': 'Endpoint URL (OpenAI compatible, e.g. https://host/v1)',
         'asr.model': 'Model name (e.g. whisper-1)',
@@ -726,6 +750,10 @@ const ARCHIVED_TAG = '已归档'
       const [asrForm, setAsrForm] = useState({ baseUrl: '', model: '', apiKey: '' })
       const [asrMsg, setAsrMsg] = useState('')
       const [asrBusy, setAsrBusy] = useState(false)
+      const [bank, setBank] = useState(null)
+      const [bankText, setBankText] = useState('')
+      const [bankMsg, setBankMsg] = useState('')
+      const [bankBusy, setBankBusy] = useState(false)
       const [recording, setRecording] = useState(false)
       const recorderRef = useRef(null)
 
@@ -816,6 +844,79 @@ const ARCHIVED_TAG = '已归档'
         }
         setError(`${hint.title}｜${hint.action}（${failure.code}）`)
       }, [t])
+
+      const loadBankInfo = useCallback(() => {
+        rpc('bank/get', {}).then((result) => {
+          if (!result.ok) return
+          setBank(result.value)
+        })
+      }, [])
+
+      useEffect(() => {
+        loadBankInfo()
+      }, [loadBankInfo])
+
+      const bankStatus = useCallback(() => {
+        const active = bank?.active ?? {}
+        const count = String(active.count ?? 0)
+        return active.source === 'custom'
+          ? t('bank.active.custom').replace('%s', count)
+          : t('bank.active.default').replace('%s', count)
+      }, [bank, t])
+
+      const parseBankText = useCallback(() => {
+        try {
+          return { bank: JSON.parse(bankText), problem: '' }
+        } catch (problem) {
+          return { bank: undefined, problem: String(problem?.message ?? problem) }
+        }
+      }, [bankText])
+
+      const checkBank = useCallback(() => {
+        setBankBusy(true)
+        setBankMsg('')
+        const parsed = parseBankText()
+        if (parsed.bank === undefined) {
+          setBankBusy(false)
+          setBankMsg(`${t('bank.invalid')}：${parsed.problem}`)
+          return
+        }
+        rpc('bank/validate', { bank: parsed.bank }).then((result) => {
+          setBankBusy(false)
+          if (!result.ok) return onError(result)
+          const warnings = result.value.warnings ?? []
+          const head = t('bank.checked').replace('%s', String(result.value.count))
+          setBankMsg(warnings.length === 0 ? head : `${head}｜${warnings.join('；')}`)
+        })
+      }, [onError, parseBankText, t])
+
+      const saveBank = useCallback(() => {
+        setBankBusy(true)
+        setBankMsg('')
+        const parsed = parseBankText()
+        if (parsed.bank === undefined) {
+          setBankBusy(false)
+          setBankMsg(`${t('bank.invalid')}：${parsed.problem}`)
+          return
+        }
+        rpc('bank/save', { bank: parsed.bank }).then((result) => {
+          setBankBusy(false)
+          if (!result.ok) return onError(result)
+          setBankMsg(t('bank.saved').replace('%s', String(result.value.count)))
+          loadBankInfo()
+        })
+      }, [loadBankInfo, onError, parseBankText, t])
+
+      const resetBank = useCallback(() => {
+        setBankBusy(true)
+        setBankMsg('')
+        rpc('bank/reset', {}).then((result) => {
+          setBankBusy(false)
+          if (!result.ok) return onError(result)
+          setBankMsg(t('bank.reset.done'))
+          loadBankInfo()
+        })
+      }, [loadBankInfo, onError, t])
 
       const loadAsr = useCallback(() => {
         rpc('asr/config', {}).then((result) => {
@@ -1516,6 +1617,38 @@ const ARCHIVED_TAG = '已归档'
                 }, t('asr.clear')),
                 asr !== null && asr.keyMask !== '' ? h('span', { style: styles.meta }, asr.keyMask) : null,
                 asrMsg !== '' ? h('span', { style: styles.meta }, asrMsg) : null,
+              ),
+            ),
+            h('details', { style: { marginTop: '14px' } },
+              h('summary', { style: { cursor: 'pointer' } },
+                t('bank.title') + (bank?.active?.source === 'custom' ? ' ✓' : '')),
+              h('p', { style: styles.meta }, t('bank.hint')),
+              h('p', { style: styles.meta }, bankStatus()),
+              h('textarea', {
+                style: { ...styles.input, minHeight: '140px', fontFamily: 'ui-monospace, Consolas, monospace' },
+                value: bankText,
+                placeholder: t('bank.ph'),
+                'aria-label': t('bank.title'),
+                onChange: (event) => setBankText(event.target.value),
+                onKeyDown: (event) => { if (isComposing(event)) return },
+                onFocus: ringOn,
+                onBlur: ringOff,
+              }),
+              h('div', { style: styles.row },
+                h('button', { type: 'button', style: styles.button, onClick: checkBank, disabled: bankBusy }, t('bank.check')),
+                h('button', {
+                  type: 'button',
+                  style: bankBusy ? styles.primaryOff : styles.primary,
+                  onClick: saveBank,
+                  disabled: bankBusy,
+                }, t('bank.save')),
+                h('button', {
+                  type: 'button',
+                  style: styles.button,
+                  onClick: resetBank,
+                  disabled: bankBusy || bank?.custom?.exists !== true,
+                }, t('bank.reset')),
+                bankMsg !== '' ? h('span', { style: styles.meta }, bankMsg) : null,
               ),
             ),
             error !== '' ? h('div', { style: styles.bad }, error) : null,

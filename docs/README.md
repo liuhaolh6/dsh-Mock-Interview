@@ -8,6 +8,7 @@
 | `adr/0003-file-storage-not-storagedomain.md` | 会话持久化选文件而非 storageDomain | G1 |
 | `adr/0004-no-code-execution-in-v1.md` | 手撕代码只做静态评审 | G1 |
 | `adr/0005-voice-tts-browser-asr-external.md` | 语音：浏览器 TTS + 自备 ASR，未配置则降级文字 | G4 |
+| `adr/0006-external-asr-endpoint.md` | 语音转写选「用户自备 OpenAI 兼容端点」的理由与否决项 | v0.4 D1 |
 | `contracts.md` | RPC 契约 v1：传输、数据结构、10 个动作、13 个错误码、八问核对 | G2 |
 | `test-plan.md` | 用例表与覆盖矩阵（正常 / 边界 / 异常） | G3 |
 | `acceptance.md` | 人工验收 10 步（含语音降级、断线续考） | G3 |

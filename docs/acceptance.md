@@ -111,6 +111,21 @@ node "D:/agent/DeepseekHarness/resources/runtime/primary-runtime/dependencies/pn
 
 **仍未人工验证**：在真机用 Java 与 Go 各提交一段代码，肉眼确认两次的边界用例列不是同一套。
 
+## v0.4 D4 自定义题库验收（2026-11-23）
+
+| 编号 | 验收动作 | 判定标准 | 结果 |
+| --- | --- | --- | --- |
+| D4-1 | `bank/validate` 提交一份 3 条题库 | 返回 `count: 3` 与四项 `kinds` 计数，`warnings` 为空 | ✅ 源码级 + 单测 TC-BNK-201 |
+| D4-2 | 提交 `kind: 'essay'` 的条目 | `E_BAD_REQUEST`，文案含「第 1 条」与四个合法值 | ✅ 单测 TC-BNK-203 |
+| D4-3 | 提交 200 条题库 | `E_BAD_REQUEST`，文案含上限 120，不被静默截断 | ✅ 单测 TC-BNK-204 |
+| D4-4 | `bank/save` 后看磁盘 | 文件落在 `$DSH_HOME/storages/dsh-mock-interview/bank.json`，无 `.tmp-*` 残留 | ✅ 集成 TC-BNK-210 |
+| D4-5 | 保存后新建面试 | `plan.bankSource === 'custom'`，题单含自定义题目，最后一题仍是手撕 | ✅ 集成 TC-BNK-210 |
+| D4-6 | 手工改坏自定义题库再新建面试 | 回退内置题库且 `bankWarning` 说明；面试正常开始 | ✅ 集成 TC-BNK-212 |
+| D4-7 | `bank/reset` 两次 | 第一次 `removed: true`，第二次 `false`（幂等） | ✅ 集成 TC-BNK-210 |
+| D4-8 | 面板折叠区三个按钮 | setup 首屏可渲染 `bank.title/hint/check/save/reset` | ✅ e2e TC-UX-013 |
+
+仍未人工验证：在真机面板里粘贴一份题库、点「校验」「保存并启用」，再新建一场面试确认题目来自自定义题库。
+
 ## 未覆盖（诚实记录）
 
 - **完整 UI 全流程一次跑通**：第 6–10 步的 RPC 语义已用活体探针逐条验证，页面交互由用户点验到「选项可读 + 页面打开」；从录入到导出的连续点击尚未由人完整走完一轮。
