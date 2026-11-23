@@ -15,7 +15,7 @@ v0.3.0 把体验磨了一遍之后，v0.4 回到「能力」上：把首条需�
 | D1 | 语音作答：自备 OpenAI 兼容转写端点（`asr/config` 读/写/清，密钥只写不读、0600），`asr/transcribe` 收 base64 音频 → 文字 → 同一条评分链路；8 MB / 120 秒 / 四种容器上限，音频不落盘；未配置则明确降级文字 | `deb77f4`、`7680654` | TC-ASR-001..007、TC-ASR-010..015、TC-UX-012 |
 | D2 | 记录复用与归档：`fromSessionId` 再面一次（沿用画像与设置、题单重排防背题）、`archived` 三态过滤（落盘只是标签，不升 schema）、`history/export` 整包 JSON | `9805173`、`310d905` | TC-HIS-201..205、TC-HIS-210..212、TC-HIS-220..222 |
 | D3 | 手撕语言化评审：java/python/javascript/go/c++/sql 六组检查点与用例风格，别名归一（`js`/`golang`/`mysql`…），未知语言回退通用并告警；`language` 进评分证据首行 | `f0f71cd` | TC-COD-201..206 |
-| D4 | 自定义题库：`bank/validate|save|get|reset` 四动作，结构/条数/`kind` 校验点名「第几条」，原子落盘，坏文件回退内置并告警；题单改为简历与题库交替，避免自定义题一道轮不上 | 见 v0.4.0 收口提交 | TC-BNK-201..206、TC-BNK-210..212、TC-UX-013 |
+| D4 | 自定义题库：`bank/validate|save|get|reset` 四动作，结构/条数/`kind` 校验点名「第几条」，原子落盘，坏文件回退内置并告警；题单改为简历与题库交替，避免自定义题一道轮不上 | `a208520` | TC-BNK-201..206、TC-BNK-210..212、TC-UX-013 |
 
 收口度量（v0.4.0）：`npm run build` 通过 · lint `0 error(s), 0 warning(s)`（68 个文件）· `npm test` **229/229** · `e2e` **19/19** · coverage 行 **98.19%** / 分支 **87.40%** / 函数 **97.19%**。
 
